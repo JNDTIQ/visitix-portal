@@ -1,10 +1,13 @@
 import React, { useState } from "react";
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, getAuth } from "firebase/auth";
 import { Link, useNavigate } from "react-router-dom";
+import { createUserProfile } from "../services/userService";
 
-const LoginPage: React.FC = () => {
+const SignupPage: React.FC = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [displayName, setDisplayName] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
@@ -14,16 +17,37 @@ const LoginPage: React.FC = () => {
         setError("");
         setLoading(true);
         
+        // Validate form
+        if (password !== confirmPassword) {
+            setError("Passwords don't match");
+            setLoading(false);
+            return;
+        }
+
+        if (password.length < 6) {
+            setError("Password must be at least 6 characters");
+            setLoading(false);
+            return;
+        }
+        
         try {
             const auth = getAuth();
-            await signInWithEmailAndPassword(auth, email, password);
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            
+            // Create user profile in Firestore
+            await createUserProfile(userCredential.user.uid, {
+                displayName,
+                email,
+                createdAt: new Date().toISOString(),
+            });
+            
             setLoading(false);
-            // Redirect to home page or dashboard
-            navigate("/");
+            // Redirect to login page or dashboard
+            navigate("/login");
         } catch (error: any) {
             setLoading(false);
-            if (error.code === "auth/invalid-credential") {
-                setError("Invalid email or password");
+            if (error.code === "auth/email-already-in-use") {
+                setError("Email is already in use");
             } else {
                 setError(error.message);
             }
@@ -35,7 +59,7 @@ const LoginPage: React.FC = () => {
              style={{ backgroundImage: `url('/api/placeholder/1200/800')` }}>
             <div className="bg-white bg-opacity-20 backdrop-blur-md p-8 rounded-2xl shadow-md w-full max-w-md">
                 <h1 className="text-3xl font-bold text-center text-blue-600 mb-6">
-                    Login to Visitix
+                    Sign Up for Visitix
                 </h1>
                 
                 {error && (
@@ -45,6 +69,14 @@ const LoginPage: React.FC = () => {
                 )}
                 
                 <form className="flex flex-col space-y-4" onSubmit={handleSubmit}>
+                    <input
+                        type="text"
+                        placeholder="Display Name"
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
+                        className="p-3 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                    />
                     <input
                         type="email"
                         placeholder="Email"
@@ -61,11 +93,14 @@ const LoginPage: React.FC = () => {
                         className="p-3 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500"
                         required
                     />
-                    <div className="flex justify-end">
-                        <Link to="/forgot-password" className="text-sm text-blue-600">
-                            Forgot Password?
-                        </Link>
-                    </div>
+                    <input
+                        type="password"
+                        placeholder="Confirm Password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="p-3 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                    />
                     <button
                         type="submit"
                         disabled={loading}
@@ -73,15 +108,15 @@ const LoginPage: React.FC = () => {
                             loading ? "opacity-70 cursor-not-allowed" : ""
                         }`}
                     >
-                        {loading ? "LOGGING IN..." : "LOGIN"}
+                        {loading ? "SIGNING UP..." : "SIGN UP"}
                     </button>
                 </form>
             </div>
             <div className="mt-8 text-center text-gray-800">
                 <p className="text-lg">
-                    Don't have an account?{" "}
-                    <Link to="/signup" className="underline text-blue-600">
-                        Sign Up
+                    Already have an account?{" "}
+                    <Link to="/login" className="underline text-blue-600">
+                        Login
                     </Link>
                 </p>
             </div>
@@ -89,4 +124,4 @@ const LoginPage: React.FC = () => {
     );
 };
 
-export default LoginPage;
+export default SignupPage;
