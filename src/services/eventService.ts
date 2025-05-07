@@ -1,23 +1,38 @@
-import { db } from "./firebase";
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from './firebase';
 
-const eventsRef = collection(db, "events");
+export interface Event {
+  id: string;
+  title: string;
+  date: string;
+  location: string;
+  image: string;
+  category: string;
+  price: number;
+  description: string;
+  featured: boolean;
+}
 
-export const createEvent = async (eventData: any) => {
-  return await addDoc(eventsRef, eventData);
-};
+export const fetchEvents = async (): Promise<Event[]> => {
+  try {
+    const eventsRef = collection(db, 'events');
+    const snapshot = await getDocs(eventsRef);
+    
+    const events: Event[] = snapshot.docs.map(doc => ({
+      id: doc.id,
+      title: doc.data().title,
+      date: doc.data().date,
+      location: doc.data().location,
+      image: doc.data().image,
+      category: doc.data().category,
+      price: doc.data().price,
+      description: doc.data().description,
+      featured: doc.data().featured
+    }));
 
-export const fetchEvents = async () => {
-  const snapshot = await getDocs(eventsRef);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-};
-
-export const updateEvent = async (id: string, updatedData: any) => {
-  const eventDoc = doc(db, "events", id);
-  return await updateDoc(eventDoc, updatedData);
-};
-
-export const deleteEvent = async (id: string) => {
-  const eventDoc = doc(db, "events", id);
-  return await deleteDoc(eventDoc);
+    return events;
+  } catch (error) {
+    console.error('Error fetching events:', error);
+    throw error;
+  }
 };

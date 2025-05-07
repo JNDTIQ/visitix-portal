@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { fetchEvents } from '../services/eventService';
-import { CalendarIcon, MapPinIcon, SearchIcon, FilterIcon } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { CalendarIcon, MapPinIcon, SearchIcon, FilterIcon, XIcon } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 interface Event {
   id: string;
@@ -15,6 +15,10 @@ interface Event {
   featured: boolean;
 }
 
+interface EventCardProps {
+  event: Event;
+}
+
 const EventsPage: React.FC = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
@@ -24,44 +28,74 @@ const EventsPage: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [priceRange, setPriceRange] = useState<number>(1000);
   const [showFilters, setShowFilters] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
   const categories = ['All', 'Music', 'Sports', 'Theater', 'Festivals', 'Workshops', 'Other'];
 
   useEffect(() => {
+    const category = searchParams.get('category') || 'All';
+    const price = searchParams.get('price') || '1000';
+    const search = searchParams.get('search') || '';
+
+    setSelectedCategory(category);
+    setPriceRange(Number(price));
+    setSearchTerm(search);
+
     const loadEvents = async () => {
       try {
         setLoading(true);
+        setError('');
         const eventData = await fetchEvents();
+        if (!eventData) {
+          throw new Error('No events data received');
+        }
         setEvents(eventData);
         setFilteredEvents(eventData);
       } catch (err) {
         console.error('Error fetching events:', err);
         setError('Failed to load events. Please try again later.');
+        setEvents([]);
+        setFilteredEvents([]);
       } finally {
         setLoading(false);
       }
     };
 
     loadEvents();
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
-    // Filter events based on search term, category, and price range
+    const params: Record<string, string> = {};
+
+    if (selectedCategory !== 'All') params.category = selectedCategory;
+    if (priceRange !== 1000) params.price = priceRange.toString();
+    if (searchTerm) params.search = searchTerm;
+
+    setSearchParams(params, { replace: true });
+
     const filtered = events.filter((event) => {
-      const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                           event.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           event.description?.toLowerCase().includes(searchTerm.toLowerCase());
-      
+      const searchLower = searchTerm.toLowerCase().trim();
+      const matchesSearch = searchLower === '' || 
+        event.title.toLowerCase().includes(searchLower) || 
+        event.location.toLowerCase().includes(searchLower) ||
+        event.description?.toLowerCase().includes(searchLower);
+
       const matchesCategory = selectedCategory === 'All' || event.category === selectedCategory;
-      
       const matchesPrice = event.price <= priceRange;
-      
+
       return matchesSearch && matchesCategory && matchesPrice;
     });
-    
+
     setFilteredEvents(filtered);
-  }, [searchTerm, selectedCategory, priceRange, events]);
+  }, [searchTerm, selectedCategory, priceRange, events, setSearchParams]);
+
+  const resetFilters = () => {
+    setSearchTerm('');
+    setSelectedCategory('All');
+    setPriceRange(1000);
+    setSearchParams({});
+  };
 
   const featuredEvents = filteredEvents.filter(event => event.featured);
   const regularEvents = filteredEvents.filter(event => !event.featured);
@@ -79,8 +113,7 @@ const EventsPage: React.FC = () => {
       <div className="bg-indigo-900 pt-16 pb-10 px-4 sm:px-6 lg:px-8 mb-10">
         <div className="max-w-7xl mx-auto">
           <h1 className="text-3xl font-bold text-white mb-6">Discover Events</h1>
-          
-          {/* Search and Filter */}
+
           <div className="relative">
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="relative flex-grow">
@@ -89,9 +122,17 @@ const EventsPage: React.FC = () => {
                   placeholder="Search events, locations, or artists"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full pl-10 pr-10 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
                 <SearchIcon className="absolute left-3 top-3.5 h-5 w-5 text-gray-400" />
+                {searchTerm && (
+                  <button 
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-3 top-3.5 text-gray-400 hover:text-gray-600"
+                  >
+                    <XIcon className="h-5 w-5" />
+                  </button>
+                )}
               </div>
               <button 
                 onClick={() => setShowFilters(!showFilters)}
@@ -101,7 +142,7 @@ const EventsPage: React.FC = () => {
                 <span>Filters</span>
               </button>
             </div>
-            
+
             {showFilters && (
               <div className="bg-white rounded-lg shadow-lg p-6 mt-2 absolute z-20 w-full">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -117,7 +158,7 @@ const EventsPage: React.FC = () => {
                       ))}
                     </select>
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Max Price: ${priceRange}
@@ -130,6 +171,15 @@ const EventsPage: React.FC = () => {
                       onChange={(e) => setPriceRange(Number(e.target.value))}
                       className="w-full"
                     />
+                  </div>
+
+                  <div className="flex items-end">
+                    <button 
+                      onClick={resetFilters}
+                      className="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded"
+                    >
+                      Reset Filters
+                    </button>
                   </div>
                 </div>
               </div>
@@ -145,7 +195,6 @@ const EventsPage: React.FC = () => {
           </div>
         )}
 
-        {/* Featured Events Section */}
         {featuredEvents.length > 0 && (
           <div className="mb-12">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Featured Events</h2>
@@ -157,7 +206,6 @@ const EventsPage: React.FC = () => {
           </div>
         )}
 
-        {/* Regular Events */}
         <div>
           <h2 className="text-2xl font-bold text-gray-900 mb-6">All Events</h2>
           {regularEvents.length > 0 ? (
@@ -177,13 +225,10 @@ const EventsPage: React.FC = () => {
   );
 };
 
-interface EventCardProps {
-  event: Event;
-}
-
 const EventCard: React.FC<EventCardProps> = ({ event }) => {
   const navigate = useNavigate();
-  
+  const [imgError, setImgError] = useState(false);
+
   return (
     <div 
       className="bg-white rounded-lg shadow overflow-hidden cursor-pointer hover:shadow-lg transition-shadow duration-300"
@@ -191,13 +236,10 @@ const EventCard: React.FC<EventCardProps> = ({ event }) => {
     >
       <div className="relative h-48">
         <img 
-          src={event.image || "/api/placeholder/400/300"} 
+          src={imgError ? "/api/placeholder/400/300" : event.image} 
           alt={event.title} 
           className="w-full h-full object-cover"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            target.src = "/api/placeholder/400/300";
-          }}
+          onError={() => setImgError(true)}
         />
         <div className="absolute top-2 left-2 bg-indigo-600 text-white text-xs font-semibold px-2 py-1 rounded">
           {event.category}
@@ -220,7 +262,13 @@ const EventCard: React.FC<EventCardProps> = ({ event }) => {
         </div>
         <div className="mt-3 flex justify-between items-center">
           <span className="font-semibold text-indigo-600">${event.price}</span>
-          <button className="text-indigo-600 font-medium hover:text-indigo-800 text-sm">
+          <button 
+            className="text-indigo-600 font-medium hover:text-indigo-800 text-sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/event/${event.id}/tickets`);
+            }}
+          >
             Buy Tickets →
           </button>
         </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { fetchEventById } from '../services/eventService';
+import { fetchEvents } from '../services/eventService';
 import { fetchResaleTickets, createResaleListing } from '../services/resaleService';
 import { CalendarIcon, MapPinIcon, TagIcon, AlertCircleIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -51,12 +51,13 @@ const TicketResalePage: React.FC = () => {
       
       try {
         setLoading(true);
-        const [eventData, ticketsData] = await Promise.all([
-          fetchEventById(id),
+        const [eventsData, ticketsData] = await Promise.all([
+          fetchEvents(),
           fetchResaleTickets(id)
         ]);
-        
-        setEvent(eventData);
+
+        const eventData = eventsData.find(event => event.id === id);
+        setEvent(eventData || null);
         setResaleTickets(ticketsData);
       } catch (err) {
         console.error('Error fetching data:', err);
@@ -118,6 +119,14 @@ const TicketResalePage: React.FC = () => {
       console.error('Error creating listing:', err);
       setSellingError('Failed to create listing. Please try again.');
     }
+  };
+
+  const handlePurchaseTicket = (ticketId: string) => {
+    if (!currentUser) {
+      navigate('/login', { state: { from: `/resale/${id}` } });
+      return;
+    }
+    navigate(`/checkout/resale/${ticketId}`);
   };
 
   if (loading) {
@@ -244,3 +253,199 @@ const TicketResalePage: React.FC = () => {
                           value={quantity}
                           onChange={(e) => setQuantity(Number(e.target.value))}
                           className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        >
+                          {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
+                            <option key={num} value={num}>
+                              {num}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label htmlFor="section" className="block text-sm font-medium text-gray-700 mb-1">
+                          Section (optional)
+                        </label>
+                        <input
+                          type="text"
+                          id="section"
+                          value={section}
+                          onChange={(e) => setSection(e.target.value)}
+                          className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="row" className="block text-sm font-medium text-gray-700 mb-1">
+                          Row (optional)
+                        </label>
+                        <input
+                          type="text"
+                          id="row"
+                          value={row}
+                          onChange={(e) => setRow(e.target.value)}
+                          className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="bg-yellow-50 border border-yellow-100 p-4 rounded-md mb-4">
+                      <div className="flex">
+                        <AlertCircleIcon className="h-5 w-5 text-yellow-400 mr-2" />
+                        <div>
+                          <p className="text-sm text-yellow-700">
+                            By listing tickets for resale, you confirm that:
+                          </p>
+                          <ul className="list-disc pl-5 mt-1 text-xs text-yellow-600">
+                            <li>You are authorized to resell these tickets</li>
+                            <li>Tickets are valid and will be transferred upon purchase</li>
+                            <li>A 10% service fee will be deducted from your earnings</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <button
+                      type="submit"
+                      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-md font-medium"
+                    >
+                      List Tickets for Sale
+                    </button>
+                  </form>
+                </div>
+              )}
+              
+              {/* Ticket listings */}
+              {resaleTickets.length > 0 ? (
+                <div className="border border-gray-200 rounded-md overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Seller
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Details
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Price
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Quantity
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Action
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {resaleTickets.map((ticket) => (
+                        <tr key={ticket.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">{ticket.sellerName}</div>
+                            <div className="text-xs text-gray-500">Listed {new Date(ticket.createdAt).toLocaleDateString()}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {ticket.section && ticket.row ? (
+                              <div className="text-sm text-gray-900">Section {ticket.section}, Row {ticket.row}</div>
+                            ) : ticket.section ? (
+                              <div className="text-sm text-gray-900">Section {ticket.section}</div>
+                            ) : ticket.row ? (
+                              <div className="text-sm text-gray-900">Row {ticket.row}</div>
+                            ) : (
+                              <div className="text-sm text-gray-500">General Admission</div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-indigo-600">${ticket.price.toFixed(2)}</div>
+                            {ticket.price > event.price ? (
+                              <div className="text-xs text-red-500">
+                                +${(ticket.price - event.price).toFixed(2)} (original)
+                              </div>
+                            ) : ticket.price < event.price ? (
+                              <div className="text-xs text-green-500">
+                                -${(event.price - ticket.price).toFixed(2)} (original)
+                              </div>
+                            ) : null}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{ticket.quantity} available</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                            <button
+                              onClick={() => handlePurchaseTicket(ticket.id)}
+                              className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-5 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            >
+                              Buy Now
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-12 border border-gray-200 rounded-md">
+                  <p className="text-gray-500">No resale tickets available for this event.</p>
+                  <p className="text-sm text-gray-400 mt-1">Be the first to list your tickets!</p>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Sidebar */}
+          <div className="lg:col-span-1">
+            {/* Event info card */}
+            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+              <h3 className="text-lg font-medium mb-4">Event Information</h3>
+              <div className="mb-4">
+                <img 
+                  src={event.image || "/api/placeholder/400/300"} 
+                  alt={event.title} 
+                  className="w-full h-40 object-cover rounded-md mb-4"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = "/api/placeholder/400/300";
+                  }}
+                />
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-700">Original Price:</span>
+                  <span className="font-semibold">${event.price.toFixed(2)}</span>
+                </div>
+              </div>
+              <button 
+                onClick={() => navigate(`/event/${id}`)}
+                className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 rounded-md font-medium"
+              >
+                View Event Details
+              </button>
+            </div>
+            
+            {/* Resale info card */}
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h3 className="text-lg font-medium mb-4">About Resale</h3>
+              <div className="space-y-4 text-sm">
+                <div>
+                  <h4 className="font-medium text-gray-900">Secure Transactions</h4>
+                  <p className="text-gray-600">All purchases and sales are processed securely through our platform.</p>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900">Buyer Protection</h4>
+                  <p className="text-gray-600">Tickets are guaranteed to be valid or your money back.</p>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900">Seller Fees</h4>
+                  <p className="text-gray-600">A 10% service fee is applied to all sales to cover processing costs.</p>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900">Instant Delivery</h4>
+                  <p className="text-gray-600">Tickets are transferred electronically immediately after purchase.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default TicketResalePage;
