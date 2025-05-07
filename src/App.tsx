@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
@@ -5,10 +6,10 @@ import { HeroSection } from './components/HeroSection';
 import { FeaturedEvents } from './components/FeaturedEvents';
 import { CtaSection } from './components/CtaSection';
 import { Footer } from './components/Footer';
-import { EventsPage } from './pages/EventsPage';
-import { EventPage } from './pages/EventPage';
-import { TicketResalePage } from './pages/TicketResalePage';
-import { CheckoutPage } from './pages/CheckoutPage';
+import EventsPage from './pages/EventsPage';
+import EventDetailPage from './pages/EventDetailPage';
+import TicketResalePage from './pages/TicketResalePage';
+import CheckoutPage from './pages/CheckoutPage';
 import LoginPage from './components/LoginPage';
 import SignupPage from './components/SignupPage';
 import ProfilePage from './components/ProfilePage';
@@ -34,7 +35,7 @@ export function App() {
               }
             />
             <Route path="/events" element={<EventsPage />} />
-            <Route path="/event/:id" element={<EventPage />} />
+            <Route path="/event/:id" element={<EventDetailPage />} />
             <Route path="/resale/:id" element={<TicketResalePage />} />
             <Route 
               path="/checkout/resale/:ticketId" 
@@ -44,6 +45,11 @@ export function App() {
                 </ProtectedRoute>
               } 
             />
+            <Route path="/checkout/:id" element={
+              <ProtectedRoute>
+                <CheckoutPage />
+              </ProtectedRoute>
+            } />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -55,6 +61,7 @@ export function App() {
                 </ProtectedRoute>
               } 
             />
+            <Route path="/payment-complete" element={<PaymentCompletePage />} />
           </Routes>
         </main>
         <Footer />
