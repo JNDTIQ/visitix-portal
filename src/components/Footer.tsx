@@ -58,7 +58,7 @@ export const Footer = () => {
             <h3 className="text-lg font-semibold mb-4">For Organizers</h3>
             <ul className="space-y-2">
               <li>
-                <a href="#create-event" className="text-gray-300 hover:text-white">
+                <a href="src/pages/SellTicketsPage.tsx" className="text-gray-300 hover:text-white">
                   Create an Event
                 </a>
               </li>

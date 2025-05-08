@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
@@ -16,6 +15,8 @@ import ProfilePage from './components/ProfilePage';
 import ForgotPassword from './components/ForgotPassword';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
+import PaymentCompletePage from './pages/PaymentCompletePage';
+import SellTicketsPage from './pages/SellTicketsPage';
 
 export function App() {
   return (
@@ -34,8 +35,10 @@ export function App() {
                 </>
               }
             />
+            <Route path="/sell" element={<SellTicketsPage />} />
             <Route path="/events" element={<EventsPage />} />
             <Route path="/event/:id" element={<EventDetailPage />} />
+            <Route path="/resale" element={<TicketResalePage />} /> {/* Added static /resale route */}
             <Route path="/resale/:id" element={<TicketResalePage />} />
             <Route 
               path="/checkout/resale/:ticketId" 

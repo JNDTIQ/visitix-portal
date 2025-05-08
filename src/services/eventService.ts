@@ -1,4 +1,4 @@
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc } from 'firebase/firestore';
 import { db } from './firebase';
 
 export interface Event {
@@ -34,5 +34,28 @@ export const fetchEvents = async (): Promise<Event[]> => {
   } catch (error) {
     console.error('Error fetching events:', error);
     throw error;
+  }
+};
+
+// Fetch a single event by its ID
+export const fetchEventById = async (eventId: string): Promise<Event | null> => {
+  try {
+    const eventDoc = await getDoc(doc(db, 'events', eventId));
+    if (!eventDoc.exists()) return null;
+    const data = eventDoc.data();
+    return {
+      id: eventDoc.id,
+      title: data.title,
+      date: data.date,
+      location: data.location,
+      image: data.image,
+      category: data.category,
+      price: data.price,
+      description: data.description,
+      featured: data.featured
+    } as Event;
+  } catch (error) {
+    console.error('Error fetching event by ID:', error);
+    return null;
   }
 };

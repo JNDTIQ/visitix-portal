@@ -1,30 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { fetchResaleTicket } from '../services/resaleService';
+import { fetchResaleTickets } from '../services/resaleService';
 import { createOrder } from '../services/orderService';
-import { loadStripe } from '@stripe/stripe-js';
-import {
-  Elements,
-  PaymentElement,
-  useStripe,
-  useElements,
-} from '@stripe/react-stripe-js';
-import { AlertCircle, CheckCircle, Lock } from 'lucide-react';
-
-// Initialize Stripe
-const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLIC_KEY!);
-
-interface CheckoutFormProps {
-  clientSecret: string;
-  ticketDetails: TicketDetails;
-  onSuccess: () => void;
-}
+import { getDoc, doc as firestoreDoc } from 'firebase/firestore';
+import { db } from '../services/firebase';
+import { AlertCircle, Lock } from 'lucide-react';
 
 interface TicketDetails {
   id: string;
   eventId: string;
   eventTitle: string;
+  eventDate: string;
+  eventLocation: string;
   price: number;
   quantity: number;
   section?: string;
@@ -32,175 +20,10 @@ interface TicketDetails {
   sellerName: string;
 }
 
-const CheckoutForm: React.FC<CheckoutFormProps> = ({
-  clientSecret,
-  ticketDetails,
-  onSuccess,
-}) => {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [error, setError] = useState<string>('');
-  const [processing, setProcessing] = useState(false);
-  const [billingDetails, setBillingDetails] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    address: {
-      line1: '',
-      line2: '',
-      city: '',
-      state: '',
-      postal_code: '',
-      country: '',
-    },
-  });
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    if (!stripe || !elements) {
-      return;
-    }
-
-    setProcessing(true);
-    setError('');
-
-    try {
-      const { error: submitError } = await elements.submit();
-      if (submitError) {
-        throw new Error(submitError.message);
-      }
-
-      const { error: paymentError, paymentIntent } = await stripe.confirmPayment({
-        elements,
-        clientSecret,
-        confirmParams: {
-          return_url: `${window.location.origin}/payment-complete`,
-          payment_method_data: {
-            billing_details: billingDetails,
-          },
-        },
-        redirect: 'if_required',
-      });
-
-      if (paymentError) {
-        throw new Error(paymentError.message);
-      }
-
-      if (paymentIntent?.status === 'succeeded') {
-        onSuccess();
-      }
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Full Name
-          </label>
-          <input
-            type="text"
-            required
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-            value={billingDetails.name}
-            onChange={(e) =>
-              setBillingDetails({ ...billingDetails, name: e.target.value })
-            }
-          />
-        </div>
-
-        {/* Billing Details Fields */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Email
-            </label>
-            <input
-              type="email"
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-              value={billingDetails.email}
-              onChange={(e) =>
-                setBillingDetails({ ...billingDetails, email: e.target.value })
-              }
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Phone
-            </label>
-            <input
-              type="tel"
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-              value={billingDetails.phone}
-              onChange={(e) =>
-                setBillingDetails({ ...billingDetails, phone: e.target.value })
-              }
-            />
-          </div>
-        </div>
-
-        {/* Address Fields */}
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Address Line 1
-            </label>
-            <input
-              type="text"
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-              value={billingDetails.address.line1}
-              onChange={(e) =>
-                setBillingDetails({
-                  ...billingDetails,
-                  address: { ...billingDetails.address, line1: e.target.value },
-                })
-              }
-            />
-          </div>
-          {/* More address fields... */}
-        </div>
-
-        {/* Payment Element */}
-        <div className="border rounded-md p-4">
-          <PaymentElement />
-        </div>
-      </div>
-
-      {error && (
-        <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative">
-          <AlertCircle className="inline-block mr-2" size={16} />
-          {error}
-        </div>
-      )}
-
-      <button
-        type="submit"
-        disabled={processing || !stripe}
-        className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
-          processing && 'opacity-50 cursor-not-allowed'
-        }`}
-      >
-        <Lock className="h-5 w-5 mr-2" />
-        {processing ? 'Processing...' : `Pay $${ticketDetails.price.toFixed(2)}`}
-      </button>
-    </form>
-  );
-};
-
 export const CheckoutPage: React.FC = () => {
   const { ticketId } = useParams<{ ticketId: string }>();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
-  const [clientSecret, setClientSecret] = useState<string>('');
   const [ticketDetails, setTicketDetails] = useState<TicketDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -210,28 +33,30 @@ export const CheckoutPage: React.FC = () => {
       try {
         if (!ticketId) throw new Error('No ticket ID provided');
 
-        // Fetch ticket details
-        const ticket = await fetchResaleTicket(ticketId);
-        if (!ticket) throw new Error('Ticket not found');
+        const tickets = await fetchResaleTickets(ticketId);
+        if (!tickets || tickets.length === 0) throw new Error('Ticket not found');
 
-        setTicketDetails(ticket);
+        const ticket = tickets[0];
 
-        // Initialize payment intent
-        const response = await fetch('/api/create-payment-intent', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            ticketId,
-            amount: ticket.price,
-          }),
+        let eventTitle = 'Unknown Event';
+        let eventDate = '';
+        let eventLocation = '';
+        if (ticket.eventId) {
+          const eventDoc = await getDoc(firestoreDoc(db, 'events', ticket.eventId));
+          if (eventDoc.exists()) {
+            const eventData = eventDoc.data();
+            eventTitle = eventData.title || 'Unknown Event';
+            eventDate = eventData.date || '';
+            eventLocation = eventData.location || '';
+          }
+        }
+
+        setTicketDetails({
+          ...ticket,
+          eventTitle,
+          eventDate,
+          eventLocation,
         });
-
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.message);
-
-        setClientSecret(data.clientSecret);
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -242,18 +67,33 @@ export const CheckoutPage: React.FC = () => {
     initializeCheckout();
   }, [ticketId]);
 
-  const handlePaymentSuccess = async () => {
-    try {
-      if (!ticketDetails || !currentUser) return;
+  const handlePayment = async () => {
+    if (!ticketDetails || !currentUser) return;
 
-      await createOrder({
-        ticketId: ticketDetails.id,
-        buyerId: currentUser.uid,
-        amount: ticketDetails.price,
-        status: 'completed',
+    try {
+      // You should have a backend endpoint that generates a WiPay payment link
+      const response = await fetch('/api/create-wipay-payment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amount: ticketDetails.price,
+          ticketId: ticketDetails.id,
+          buyerId: currentUser.uid,
+          email: currentUser.email,
+          description: `Purchase of ticket for ${ticketDetails.eventTitle}`,
+        }),
       });
 
-      navigate('/payment-complete');
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to initialize payment');
+
+      const { paymentUrl } = data;
+
+      // Redirect user to WiPay payment page
+      window.location.href = paymentUrl;
+
     } catch (err: any) {
       setError(err.message);
     }
@@ -267,11 +107,11 @@ export const CheckoutPage: React.FC = () => {
     );
   }
 
-  if (error || !ticketDetails || !clientSecret) {
+  if (error || !ticketDetails) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
-          {error || 'Failed to initialize checkout'}
+          {error || 'Failed to load ticket'}
         </div>
       </div>
     );
@@ -290,6 +130,14 @@ export const CheckoutPage: React.FC = () => {
               <div className="flex justify-between">
                 <span>Event</span>
                 <span className="font-medium">{ticketDetails.eventTitle}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Date</span>
+                <span className="font-medium">{ticketDetails.eventDate}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Location</span>
+                <span className="font-medium">{ticketDetails.eventLocation}</span>
               </div>
               <div className="flex justify-between">
                 <span>Section</span>
@@ -316,22 +164,14 @@ export const CheckoutPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Payment Form */}
-          <Elements
-            stripe={stripePromise}
-            options={{
-              clientSecret,
-              appearance: {
-                theme: 'stripe',
-              },
-            }}
+          {/* Payment Button */}
+          <button
+            onClick={handlePayment}
+            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
           >
-            <CheckoutForm
-              clientSecret={clientSecret}
-              ticketDetails={ticketDetails}
-              onSuccess={handlePaymentSuccess}
-            />
-          </Elements>
+            <Lock className="h-5 w-5 mr-2" />
+            Continue to Payment
+          </button>
         </div>
       </div>
     </div>
