@@ -13,7 +13,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 
-interface ResaleTicket {
+export interface ResaleTicket {
   id: string;
   eventId: string;
   sellerId: string;
@@ -23,6 +23,7 @@ interface ResaleTicket {
   section?: string;
   row?: string;
   createdAt: string;
+  eventTitle: string;
 }
 
 interface ResaleTicketInput {

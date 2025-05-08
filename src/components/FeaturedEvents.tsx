@@ -1,34 +1,36 @@
-import React from 'react';
 import { CalendarIcon, MapPinIcon } from 'lucide-react';
+import { Link } from 'react-router-dom'; // Import Link from React Router
+
 const events = [{
   id: 1,
-  title: 'Summer Music Festival',
-  date: 'Aug 15-17, 2023',
-  location: 'Central Park, New York',
+  title: '',
+  date: '',
+  location: '',
   image: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80',
   category: 'Music'
 }, {
   id: 2,
-  title: 'International Food Festival',
-  date: 'Sep 5-7, 2023',
-  location: 'Downtown Chicago',
+  title: '',
+  date: '',
+  location: '',
   image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1374&q=80',
   category: 'Food'
 }, {
   id: 3,
-  title: 'NBA Finals 2023',
-  date: 'Jun 10, 2023',
-  location: 'Madison Square Garden',
+  title: '',
+  date: '',
+  location: '',
   image: 'https://images.unsplash.com/photo-1504450758481-7338eba7524a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1469&q=80',
   category: 'Sports'
 }, {
   id: 4,
-  title: 'Broadway Show: Hamilton',
-  date: 'Every weekend',
-  location: 'Broadway Theater, NYC',
+  title: '',
+  date: '',
+  location: '',
   image: 'https://images.unsplash.com/photo-1503095396549-807759245b35?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1471&q=80',
   category: 'Theater'
 }];
+
 export const FeaturedEvents = () => {
   return <section className="py-16 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -90,9 +92,9 @@ export const FeaturedEvents = () => {
               </div>)}
           </div>
           <div className="mt-12 text-center">
-            <a href="#all-events" className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+            <Link to="/events" className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
               View All Events
-            </a>
+            </Link>
           </div>
         </div>
       </div>

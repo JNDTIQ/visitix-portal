@@ -1,278 +1,40 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { fetchEvents } from '../services/eventService';
-import { CalendarIcon, MapPinIcon, SearchIcon, FilterIcon, XIcon } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-
-interface Event {
-  id: string;
-  title: string;
-  date: string;
-  location: string;
-  image: string;
-  category: string;
-  price: number;
-  description: string;
-  featured: boolean;
-}
-
-interface EventCardProps {
-  event: Event;
-}
+import { Link } from 'react-router-dom';
 
 const EventsPage: React.FC = () => {
-  const [events, setEvents] = useState<Event[]>([]);
-  const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [priceRange, setPriceRange] = useState<number>(1000);
-  const [showFilters, setShowFilters] = useState(false);
-  const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
-
-  const categories = ['All', 'Music', 'Sports', 'Theater', 'Festivals', 'Workshops', 'Other'];
 
   useEffect(() => {
-    const category = searchParams.get('category') || 'All';
-    const price = searchParams.get('price') || '1000';
-    const search = searchParams.get('search') || '';
-
-    setSelectedCategory(category);
-    setPriceRange(Number(price));
-    setSearchTerm(search);
-
-    const loadEvents = async () => {
-      try {
-        setLoading(true);
-        setError('');
-        const eventData = await fetchEvents();
-        if (!eventData) {
-          throw new Error('No events data received');
-        }
-        setEvents(eventData);
-        setFilteredEvents(eventData);
-      } catch (err) {
-        console.error('Error fetching events:', err);
-        setError('Failed to load events. Please try again later.');
-        setEvents([]);
-        setFilteredEvents([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadEvents();
-  }, [searchParams]);
-
-  useEffect(() => {
-    const params: Record<string, string> = {};
-
-    if (selectedCategory !== 'All') params.category = selectedCategory;
-    if (priceRange !== 1000) params.price = priceRange.toString();
-    if (searchTerm) params.search = searchTerm;
-
-    setSearchParams(params, { replace: true });
-
-    const filtered = events.filter((event) => {
-      const searchLower = searchTerm.toLowerCase().trim();
-      const matchesSearch = searchLower === '' || 
-        event.title.toLowerCase().includes(searchLower) || 
-        event.location.toLowerCase().includes(searchLower) ||
-        event.description?.toLowerCase().includes(searchLower);
-
-      const matchesCategory = selectedCategory === 'All' || event.category === selectedCategory;
-      const matchesPrice = event.price <= priceRange;
-
-      return matchesSearch && matchesCategory && matchesPrice;
-    });
-
-    setFilteredEvents(filtered);
-  }, [searchTerm, selectedCategory, priceRange, events, setSearchParams]);
-
-  const resetFilters = () => {
-    setSearchTerm('');
-    setSelectedCategory('All');
-    setPriceRange(1000);
-    setSearchParams({});
-  };
-
-  const featuredEvents = filteredEvents.filter(event => event.featured);
-  const regularEvents = filteredEvents.filter(event => !event.featured);
+    fetchEvents()
+      .then(setEvents)
+      .finally(() => setLoading(false));
+  }, []);
 
   if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
-      </div>
-    );
+    return <div className="text-center py-10">Loading events...</div>;
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen pb-16">
-      <div className="bg-indigo-900 pt-16 pb-10 px-4 sm:px-6 lg:px-8 mb-10">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-bold text-white mb-6">Discover Events</h1>
-
-          <div className="relative">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="relative flex-grow">
-                <input
-                  type="text"
-                  placeholder="Search events, locations, or artists"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-10 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <SearchIcon className="absolute left-3 top-3.5 h-5 w-5 text-gray-400" />
-                {searchTerm && (
-                  <button 
-                    onClick={() => setSearchTerm('')}
-                    className="absolute right-3 top-3.5 text-gray-400 hover:text-gray-600"
-                  >
-                    <XIcon className="h-5 w-5" />
-                  </button>
-                )}
-              </div>
-              <button 
-                onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center justify-center gap-2 bg-indigo-600 text-white rounded-lg px-4 py-3 hover:bg-indigo-700"
-              >
-                <FilterIcon className="h-5 w-5" />
-                <span>Filters</span>
-              </button>
-            </div>
-
-            {showFilters && (
-              <div className="bg-white rounded-lg shadow-lg p-6 mt-2 absolute z-20 w-full">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-                    <select
-                      value={selectedCategory}
-                      onChange={(e) => setSelectedCategory(e.target.value)}
-                      className="w-full rounded-lg border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                    >
-                      {categories.map((category) => (
-                        <option key={category} value={category}>{category}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Max Price: ${priceRange}
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1000"
-                      value={priceRange}
-                      onChange={(e) => setPriceRange(Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </div>
-
-                  <div className="flex items-end">
-                    <button 
-                      onClick={resetFilters}
-                      className="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded"
-                    >
-                      Reset Filters
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-            {error}
-          </div>
-        )}
-
-        {featuredEvents.length > 0 && (
-          <div className="mb-12">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Featured Events</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {featuredEvents.map((event) => (
-                <EventCard key={event.id} event={event} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">All Events</h2>
-          {regularEvents.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {regularEvents.map((event) => (
-                <EventCard key={event.id} event={event} />
-              ))}
-            </div>
-          ) : (
-            <div className="bg-white rounded-lg shadow p-6 text-center">
-              <p className="text-gray-500">No events found matching your criteria.</p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const EventCard: React.FC<EventCardProps> = ({ event }) => {
-  const navigate = useNavigate();
-  const [imgError, setImgError] = useState(false);
-
-  return (
-    <div 
-      className="bg-white rounded-lg shadow overflow-hidden cursor-pointer hover:shadow-lg transition-shadow duration-300"
-      onClick={() => navigate(`/event/${event.id}`)}
-    >
-      <div className="relative h-48">
-        <img 
-          src={imgError ? "/api/placeholder/400/300" : event.image} 
-          alt={event.title} 
-          className="w-full h-full object-cover"
-          onError={() => setImgError(true)}
-        />
-        <div className="absolute top-2 left-2 bg-indigo-600 text-white text-xs font-semibold px-2 py-1 rounded">
-          {event.category}
-        </div>
-        {event.featured && (
-          <div className="absolute top-2 right-2 bg-yellow-500 text-white text-xs font-semibold px-2 py-1 rounded">
-            Featured
-          </div>
-        )}
-      </div>
-      <div className="p-4">
-        <h3 className="text-lg font-medium text-gray-900 mb-1">{event.title}</h3>
-        <div className="flex items-center mt-1 text-sm text-gray-500">
-          <CalendarIcon className="h-4 w-4 mr-1" />
-          <span>{event.date}</span>
-        </div>
-        <div className="flex items-center mt-1 text-sm text-gray-500">
-          <MapPinIcon className="h-4 w-4 mr-1" />
-          <span>{event.location}</span>
-        </div>
-        <div className="mt-3 flex justify-between items-center">
-          <span className="font-semibold text-indigo-600">${event.price}</span>
-          <button 
-            className="text-indigo-600 font-medium hover:text-indigo-800 text-sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/event/${event.id}/tickets`);
-            }}
-          >
-            Buy Tickets →
-          </button>
-        </div>
-      </div>
+    <div className="max-w-4xl mx-auto py-10">
+      <h1 className="text-2xl font-bold mb-6">Events</h1>
+      {events.length === 0 ? (
+        <div>No events found.</div>
+      ) : (
+        <ul className="space-y-4">
+          {events.map(event => (
+            <li key={event.id} className="border rounded p-4 hover:shadow transition">
+              <Link to={`/event/${event.id}`} className="block hover:text-indigo-600">
+                <div className="font-semibold text-lg">{event.title}</div>
+                <div>{event.date} - {event.location}</div>
+                <div className="text-gray-600">{event.description}</div>
+                <div className="mt-2 text-indigo-600 underline text-sm">View Details & Buy Tickets</div>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 };

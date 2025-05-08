@@ -35,9 +35,21 @@ const TicketResalePage: React.FC = () => {
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const { currentUser, userProfile } = useAuth();
-  
+
   // Sell ticket form state
   const [showSellForm, setShowSellForm] = useState(false);
+
+  // If no id, show a message or a list of events to select from
+  if (!id) {
+    return (
+      <div className="max-w-2xl mx-auto py-16 text-center">
+        <h2 className="text-2xl font-bold mb-4">Select an event to resell tickets</h2>
+        <p className="text-gray-600 mb-6">
+          Please browse <a href="/events" className="text-indigo-600 underline">Events</a> and choose the event you want to resell tickets for.
+        </p>
+      </div>
+    );
+  }
   const [price, setPrice] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [section, setSection] = useState('');
