@@ -14,9 +14,13 @@ import SignupPage from './components/SignupPage';
 import ProfilePage from './components/ProfilePage';
 import ForgotPassword from './components/ForgotPassword';
 import ProtectedRoute from './components/ProtectedRoute';
+import VerifierRoute from './components/VerifierRoute';
 import { AuthProvider } from './contexts/AuthContext';
 import PaymentCompletePage from './pages/PaymentCompletePage';
 import SellTicketsPage from './pages/SellTicketsPage';
+import TicketTransferPage from './pages/TicketTransferPage';
+import TicketVerificationPage from './pages/TicketVerificationPage';
+import CreateResaleTicketPage from './pages/CreateResaleTicketPage';
 
 export function App() {
   return (
@@ -38,8 +42,16 @@ export function App() {
             <Route path="/sell" element={<SellTicketsPage />} />
             <Route path="/events" element={<EventsPage />} />
             <Route path="/event/:id" element={<EventDetailPage />} />
-            <Route path="/resale" element={<TicketResalePage />} /> {/* Added static /resale route */}
-            <Route path="/resale/:id" element={<TicketResalePage />} />
+            <Route path="/resale" element={<TicketResalePage />} /> {/* Main resale route - accessible from CTA and navigation */}
+            <Route path="/resale/:id" element={<TicketResalePage />} /> {/* Route for specific event's resale tickets */}
+            <Route 
+              path="/resale/create" 
+              element={
+                <ProtectedRoute>
+                  <CreateResaleTicketPage />
+                </ProtectedRoute>
+              } 
+            /> {/* New route for creating a resale ticket */}
             <Route 
               path="/checkout/resale/:ticketId" 
               element={
@@ -65,6 +77,30 @@ export function App() {
               } 
             />
             <Route path="/payment-complete" element={<PaymentCompletePage />} />
+            <Route 
+              path="/transfer" 
+              element={
+                <ProtectedRoute>
+                  <TicketTransferPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/transfer/:eventId" 
+              element={
+                <ProtectedRoute>
+                  <TicketTransferPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/verify-ticket/:id" 
+              element={
+                <VerifierRoute>
+                  <TicketVerificationPage />
+                </VerifierRoute>
+              } 
+            />
           </Routes>
         </main>
         <Footer />

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { fetchResaleTickets } from '../services/resaleService';
+import { fetchResaleTicketById } from '../services/resaleService';
 import { createOrder } from '../services/orderService';
 import { getDoc, doc as firestoreDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
@@ -18,12 +18,16 @@ interface TicketDetails {
   section?: string;
   row?: string;
   sellerName: string;
+  sellerId?: string;
 }
 
 export const CheckoutPage: React.FC = () => {
-  const { ticketId } = useParams<{ ticketId: string }>();
+  const { id, ticketId } = useParams<{ id: string, ticketId: string }>();
+  const location = useLocation();
+  const isResaleTicket = location.pathname.includes('resale');
+  const currentTicketId = isResaleTicket ? ticketId : id;
   const { currentUser } = useAuth();
-  const navigate = useNavigate();
+  const navigate = useNavigate(); // Used for navigation after payment processing
   const [ticketDetails, setTicketDetails] = useState<TicketDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -31,32 +35,59 @@ export const CheckoutPage: React.FC = () => {
   useEffect(() => {
     const initializeCheckout = async () => {
       try {
-        if (!ticketId) throw new Error('No ticket ID provided');
+        if (!currentTicketId) throw new Error('No ticket ID provided');
 
-        const tickets = await fetchResaleTickets(ticketId);
-        if (!tickets || tickets.length === 0) throw new Error('Ticket not found');
+        // Handle different types of tickets (regular and resale)
+        if (isResaleTicket) {
+          // Fetch resale ticket
+          const resaleTicket = await fetchResaleTicketById(currentTicketId);
+          if (!resaleTicket) throw new Error('Ticket not found');
 
-        const ticket = tickets[0];
-
-        let eventTitle = 'Unknown Event';
-        let eventDate = '';
-        let eventLocation = '';
-        if (ticket.eventId) {
-          const eventDoc = await getDoc(firestoreDoc(db, 'events', ticket.eventId));
-          if (eventDoc.exists()) {
-            const eventData = eventDoc.data();
-            eventTitle = eventData.title || 'Unknown Event';
-            eventDate = eventData.date || '';
-            eventLocation = eventData.location || '';
+          let eventTitle = resaleTicket.eventTitle || 'Unknown Event';
+          let eventDate = '';
+          let eventLocation = '';
+          
+          // Get event details if needed
+          if (resaleTicket.eventId && (!resaleTicket.eventTitle || resaleTicket.eventTitle === 'Unknown Event')) {
+            const eventDoc = await getDoc(firestoreDoc(db, 'events', resaleTicket.eventId));
+            if (eventDoc.exists()) {
+              const eventData = eventDoc.data();
+              eventTitle = eventData.title || 'Unknown Event';
+              eventDate = eventData.date || '';
+              eventLocation = eventData.location || '';
+            }
           }
-        }
 
-        setTicketDetails({
-          ...ticket,
-          eventTitle,
-          eventDate,
-          eventLocation,
-        });
+          setTicketDetails({
+            id: resaleTicket.id,
+            eventId: resaleTicket.eventId,
+            eventTitle: eventTitle,
+            eventDate: eventDate,
+            eventLocation: eventLocation,
+            price: resaleTicket.price,
+            quantity: resaleTicket.quantity,
+            section: resaleTicket.section,
+            row: resaleTicket.row,
+            sellerName: resaleTicket.sellerName,
+            sellerId: resaleTicket.sellerId
+          });
+        } else {
+          // Handle regular event tickets (non-resale)
+          const eventDoc = await getDoc(firestoreDoc(db, 'events', currentTicketId));
+          if (!eventDoc.exists()) throw new Error('Event not found');
+          
+          const eventData = eventDoc.data();
+          setTicketDetails({
+            id: currentTicketId,
+            eventId: currentTicketId,
+            eventTitle: eventData.title || 'Unknown Event',
+            eventDate: eventData.date || '',
+            eventLocation: eventData.location || '',
+            price: eventData.price || 0,
+            quantity: 1, // Default for direct purchases
+            sellerName: 'Official Seller'
+          });
+        }
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -65,12 +96,22 @@ export const CheckoutPage: React.FC = () => {
     };
 
     initializeCheckout();
-  }, [ticketId]);
+  }, [currentTicketId, isResaleTicket]);
 
   const handlePayment = async () => {
     if (!ticketDetails || !currentUser) return;
 
     try {
+      // Create an order record first
+      await createOrder({
+        ticketId: ticketDetails.id,
+        buyerId: currentUser.uid,
+        amount: ticketDetails.price,
+        status: 'pending',
+        eventId: ticketDetails.eventId,
+        quantity: ticketDetails.quantity
+      });
+
       // You should have a backend endpoint that generates a WiPay payment link
       const response = await fetch('/api/create-wipay-payment', {
         method: 'POST',
@@ -155,6 +196,12 @@ export const CheckoutPage: React.FC = () => {
                 <span>Quantity</span>
                 <span className="font-medium">{ticketDetails.quantity}</span>
               </div>
+              {isResaleTicket && (
+                <div className="flex justify-between">
+                  <span>Seller</span>
+                  <span className="font-medium">{ticketDetails.sellerName}</span>
+                </div>
+              )}
               <div className="flex justify-between pt-2 border-t">
                 <span className="font-medium">Total</span>
                 <span className="font-bold text-lg">
