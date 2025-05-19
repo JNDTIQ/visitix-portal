@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchEventById } from '../services/eventService';
-import { CalendarIcon, MapPinIcon, Clock10Icon, TagIcon, UsersIcon } from 'lucide-react';
+import { CalendarIcon, MapPinIcon, TagIcon, UsersIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface Event {
