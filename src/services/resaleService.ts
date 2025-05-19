@@ -24,6 +24,9 @@ export interface ResaleTicket {
   row?: string;
   createdAt: string;
   eventTitle: string;
+  validationId?: string;
+  ticketFiles?: string[];
+  ticketType?: 'physical' | 'digital';
 }
 
 interface ResaleTicketInput {
@@ -35,6 +38,10 @@ interface ResaleTicketInput {
   section?: string;
   row?: string;
   createdAt: string;
+  eventTitle: string;
+  validationId?: string;
+  ticketFiles?: string[];
+  ticketType?: 'physical' | 'digital';
 }
 
 /**
@@ -45,24 +52,73 @@ interface ResaleTicketInput {
 export const fetchResaleTickets = async (eventId: string): Promise<ResaleTicket[]> => {
   try {
     const ticketsRef = collection(db, 'resaleTickets');
-    const q = query(
-      ticketsRef,
-      where('eventId', '==', eventId),
-      where('quantity', '>', 0), // Only show tickets that are still available
-      orderBy('price', 'asc') // Sort by price from lowest to highest
-    );
     
-    const querySnapshot = await getDocs(q);
-    const tickets: ResaleTicket[] = [];
-    
-    querySnapshot.forEach((doc) => {
-      tickets.push({
-        id: doc.id,
-        ...doc.data() as Omit<ResaleTicket, 'id'>
+    try {
+      const q = query(
+        ticketsRef,
+        where('eventId', '==', eventId),
+        where('quantity', '>', 0), // Only show tickets that are still available
+        orderBy('price', 'asc') // Sort by price from lowest to highest
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const tickets: ResaleTicket[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        tickets.push({
+          id: doc.id,
+          eventId: data.eventId || '',
+          sellerId: data.sellerId || '',
+          sellerName: data.sellerName || '',
+          price: data.price || 0,
+          quantity: data.quantity || 0,
+          section: data.section,
+          row: data.row,
+          createdAt: data.createdAt || new Date().toISOString(),
+          eventTitle: data.eventTitle || '',
+          validationId: data.validationId,
+          ticketFiles: data.ticketFiles || [],
+          ticketType: data.ticketType,
+        });
       });
-    });
-    
-    return tickets;
+      
+      return tickets;
+    } catch (indexError) {
+      console.warn('Missing index, falling back to simpler query:', indexError);
+      
+      // Fallback to a simpler query without ordering
+      const simpleQuery = query(
+        ticketsRef,
+        where('eventId', '==', eventId),
+        where('quantity', '>', 0)
+      );
+      
+      const querySnapshot = await getDocs(simpleQuery);
+      const tickets: ResaleTicket[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        tickets.push({
+          id: doc.id,
+          eventId: data.eventId || '',
+          sellerId: data.sellerId || '',
+          sellerName: data.sellerName || '',
+          price: data.price || 0,
+          quantity: data.quantity || 0,
+          section: data.section,
+          row: data.row,
+          createdAt: data.createdAt || new Date().toISOString(),
+          eventTitle: data.eventTitle || '',
+          validationId: data.validationId,
+          ticketFiles: data.ticketFiles || [],
+          ticketType: data.ticketType,
+        });
+      });
+      
+      // Sort manually in memory if we can't use Firestore's ordering
+      return tickets.sort((a, b) => a.price - b.price);
+    }
   } catch (error) {
     console.error('Error fetching resale tickets:', error);
     throw new Error('Failed to fetch resale tickets');
@@ -92,10 +148,166 @@ export const createResaleListing = async (ticketData: ResaleTicketInput): Promis
 };
 
 /**
- * Fetches a specific resale ticket by ID
- * @param ticketId The ID of the ticket to fetch
- * @returns Promise with the ResaleTicket object
+ * Fetches all available resale tickets across all events
+ * @returns Promise with an array of ResaleTicket objects
  */
+export const fetchAllResaleTickets = async (): Promise<ResaleTicket[]> => {
+  try {
+    const ticketsRef = collection(db, 'resaleTickets');
+    
+    // First try with the composite query (requires index)
+    try {
+      const q = query(
+        ticketsRef,
+        where('quantity', '>', 0), // Only show tickets that are still available
+        orderBy('serverTimestamp', 'desc') // Most recently listed first
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const tickets: ResaleTicket[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        tickets.push({
+          id: doc.id,
+          eventId: data.eventId || '',
+          sellerId: data.sellerId || '',
+          sellerName: data.sellerName || '',
+          price: data.price || 0,
+          quantity: data.quantity || 0,
+          section: data.section,
+          row: data.row,
+          createdAt: data.createdAt || new Date().toISOString(),
+          eventTitle: data.eventTitle || '',
+          validationId: data.validationId,
+          ticketFiles: data.ticketFiles || [],
+          ticketType: data.ticketType,
+        });
+      });
+      
+      return tickets;
+    } catch (indexError) {
+      console.warn('Missing index, falling back to simpler query:', indexError);
+      
+      // Fallback to a simpler query without ordering if index doesn't exist
+      const simpleQuery = query(
+        ticketsRef,
+        where('quantity', '>', 0)
+      );
+      
+      const querySnapshot = await getDocs(simpleQuery);
+      const tickets: ResaleTicket[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        tickets.push({
+          id: doc.id,
+          eventId: data.eventId || '',
+          sellerId: data.sellerId || '',
+          sellerName: data.sellerName || '',
+          price: data.price || 0,
+          quantity: data.quantity || 0,
+          section: data.section,
+          row: data.row,
+          createdAt: data.createdAt || new Date().toISOString(),
+          eventTitle: data.eventTitle || '',
+          validationId: data.validationId,
+          ticketFiles: data.ticketFiles || [],
+          ticketType: data.ticketType,
+        });
+      });
+      
+      // Sort in memory if we can't use Firestore's ordering
+      return tickets.sort((a, b) => {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+    }
+  } catch (error) {
+    console.error('Error fetching all resale tickets:', error);
+    throw new Error('Failed to fetch resale tickets');
+  }
+};
+
+/**
+ * Fetches all resale tickets listed by a specific seller
+ * @param sellerId The ID of the seller
+ * @returns Promise with an array of ResaleTicket objects
+ */
+export const fetchUserResaleTickets = async (sellerId: string): Promise<ResaleTicket[]> => {
+  try {
+    const ticketsRef = collection(db, 'resaleTickets');
+    
+    try {
+      const q = query(
+        ticketsRef,
+        where('sellerId', '==', sellerId),
+        orderBy('serverTimestamp', 'desc')
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const tickets: ResaleTicket[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        tickets.push({
+          id: doc.id,
+          eventId: data.eventId || '',
+          sellerId: data.sellerId || '',
+          sellerName: data.sellerName || '',
+          price: data.price || 0,
+          quantity: data.quantity || 0,
+          section: data.section,
+          row: data.row,
+          createdAt: data.createdAt || new Date().toISOString(),
+          eventTitle: data.eventTitle || '',
+          validationId: data.validationId,
+          ticketFiles: data.ticketFiles || [],
+          ticketType: data.ticketType,
+        });
+      });
+      
+      return tickets;
+    } catch (indexError) {
+      console.warn('Missing index, falling back to simpler query:', indexError);
+      
+      // Fallback to a simpler query without ordering
+      const simpleQuery = query(
+        ticketsRef,
+        where('sellerId', '==', sellerId)
+      );
+      
+      const querySnapshot = await getDocs(simpleQuery);
+      const tickets: ResaleTicket[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        tickets.push({
+          id: doc.id,
+          eventId: data.eventId || '',
+          sellerId: data.sellerId || '',
+          sellerName: data.sellerName || '',
+          price: data.price || 0,
+          quantity: data.quantity || 0,
+          section: data.section,
+          row: data.row,
+          createdAt: data.createdAt || new Date().toISOString(),
+          eventTitle: data.eventTitle || '',
+          validationId: data.validationId,
+          ticketFiles: data.ticketFiles || [],
+          ticketType: data.ticketType,
+        });
+      });
+      
+      // Sort manually in memory if we can't use Firestore's ordering
+      return tickets.sort((a, b) => {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+    }
+  } catch (error) {
+    console.error('Error fetching user resale tickets:', error);
+    throw new Error('Failed to fetch user tickets');
+  }
+};
 export const fetchResaleTicketById = async (ticketId: string): Promise<ResaleTicket> => {
   try {
     const ticketRef = doc(db, 'resaleTickets', ticketId);
@@ -105,9 +317,21 @@ export const fetchResaleTicketById = async (ticketId: string): Promise<ResaleTic
       throw new Error('Ticket not found');
     }
     
+    const data = ticketDoc.data();
     return {
       id: ticketDoc.id,
-      ...ticketDoc.data() as Omit<ResaleTicket, 'id'>
+      eventId: data.eventId || '',
+      sellerId: data.sellerId || '',
+      sellerName: data.sellerName || '',
+      price: data.price || 0,
+      quantity: data.quantity || 0,
+      section: data.section,
+      row: data.row,
+      createdAt: data.createdAt || new Date().toISOString(),
+      eventTitle: data.eventTitle || '',
+      validationId: data.validationId,
+      ticketFiles: data.ticketFiles || [],
+      ticketType: data.ticketType,
     };
   } catch (error) {
     console.error('Error fetching resale ticket:', error);
@@ -163,23 +387,73 @@ export const updateTicketQuantity = async (
 export const fetchUserListings = async (sellerId: string): Promise<ResaleTicket[]> => {
   try {
     const ticketsRef = collection(db, 'resaleTickets');
-    const q = query(
-      ticketsRef,
-      where('sellerId', '==', sellerId),
-      orderBy('createdAt', 'desc')
-    );
     
-    const querySnapshot = await getDocs(q);
-    const tickets: ResaleTicket[] = [];
-    
-    querySnapshot.forEach((doc) => {
-      tickets.push({
-        id: doc.id,
-        ...doc.data() as Omit<ResaleTicket, 'id'>
+    try {
+      const q = query(
+        ticketsRef,
+        where('sellerId', '==', sellerId),
+        orderBy('createdAt', 'desc')
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const tickets: ResaleTicket[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        tickets.push({
+          id: doc.id,
+          eventId: data.eventId || '',
+          sellerId: data.sellerId || '',
+          sellerName: data.sellerName || '',
+          price: data.price || 0,
+          quantity: data.quantity || 0,
+          section: data.section,
+          row: data.row,
+          createdAt: data.createdAt || new Date().toISOString(),
+          eventTitle: data.eventTitle || '',
+          validationId: data.validationId,
+          ticketFiles: data.ticketFiles || [],
+          ticketType: data.ticketType,
+        });
       });
-    });
-    
-    return tickets;
+      
+      return tickets;
+    } catch (indexError) {
+      console.warn('Missing index, falling back to simpler query:', indexError);
+      
+      // Fallback to a simpler query without ordering
+      const simpleQuery = query(
+        ticketsRef,
+        where('sellerId', '==', sellerId)
+      );
+      
+      const querySnapshot = await getDocs(simpleQuery);
+      const tickets: ResaleTicket[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        tickets.push({
+          id: doc.id,
+          eventId: data.eventId || '',
+          sellerId: data.sellerId || '',
+          sellerName: data.sellerName || '',
+          price: data.price || 0,
+          quantity: data.quantity || 0,
+          section: data.section,
+          row: data.row,
+          createdAt: data.createdAt || new Date().toISOString(),
+          eventTitle: data.eventTitle || '',
+          validationId: data.validationId,
+          ticketFiles: data.ticketFiles || [],
+          ticketType: data.ticketType,
+        });
+      });
+      
+      // Sort manually in memory if we can't use Firestore's ordering
+      return tickets.sort((a, b) => {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+    }
   } catch (error) {
     console.error('Error fetching user listings:', error);
     throw new Error('Failed to fetch user listings');
@@ -215,5 +489,46 @@ export const removeTicketListing = async (
   } catch (error) {
     console.error('Error removing ticket listing:', error);
     throw new Error('Failed to remove ticket listing');
+  }
+};
+
+/**
+ * Updates an existing resale ticket
+ * @param ticketId The ID of the ticket to update
+ * @param updates The fields to update
+ * @returns Promise that resolves when the update is complete
+ */
+export const updateResaleTicket = async (
+  ticketId: string, 
+  updates: Partial<Omit<ResaleTicket, 'id' | 'createdAt'>>
+): Promise<void> => {
+  try {
+    const ticketRef = doc(db, 'resaleTickets', ticketId);
+    
+    // Add server timestamp for accurate sorting of updated listings
+    const updatesWithTimestamp = {
+      ...updates,
+      updatedAt: serverTimestamp()
+    };
+    
+    await updateDoc(ticketRef, updatesWithTimestamp);
+  } catch (error) {
+    console.error('Error updating resale ticket:', error);
+    throw new Error('Failed to update resale ticket');
+  }
+};
+
+/**
+ * Deletes a resale ticket
+ * @param ticketId The ID of the ticket to delete
+ * @returns Promise that resolves when the delete is complete
+ */
+export const deleteResaleTicket = async (ticketId: string): Promise<void> => {
+  try {
+    const ticketRef = doc(db, 'resaleTickets', ticketId);
+    await deleteDoc(ticketRef);
+  } catch (error) {
+    console.error('Error deleting resale ticket:', error);
+    throw new Error('Failed to delete resale ticket');
   }
 };

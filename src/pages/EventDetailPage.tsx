@@ -219,6 +219,15 @@ const EventDetailPage: React.FC = () => {
                   View Resale Marketplace
                 </button>
               </div>
+              
+              <div className="mt-4">
+                <button
+                  onClick={() => navigate(`/resale/create?eventId=${id}`)}
+                  className="w-full bg-transparent border border-green-600 text-green-600 py-3 rounded-md font-medium hover:bg-green-50 transition-colors"
+                >
+                  List Tickets for Resale
+                </button>
+              </div>
             </div>
           </div>
         </div>
