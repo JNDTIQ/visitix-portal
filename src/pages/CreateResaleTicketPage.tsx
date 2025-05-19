@@ -2,16 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { createResaleListing } from '../services/resaleService';
-import { fetchEvents, fetchEventById } from '../services/eventService';
+import { fetchEvents, Event } from '../services/eventService';
 import { useTicketUpload } from '../hooks/useTicketUploadResale';
 
-interface Event {
-  id: string;
-  title: string;
-  date: string;
-  venueId: string;
-  venueName: string;
-}
+// Removed local Event interface; using Event from eventService instead
 
 const CreateResaleTicketPage: React.FC = () => {
   const { currentUser, userProfile } = useAuth();
@@ -137,7 +131,7 @@ const CreateResaleTicketPage: React.FC = () => {
         ticketType: formData.ticketType
       };
       
-      const ticketId = await createResaleListing(resaleTicketData);
+      await createResaleListing(resaleTicketData);
       
       setSuccessMessage('Your ticket has been successfully listed for resale!');
       
