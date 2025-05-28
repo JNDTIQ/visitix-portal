@@ -1,7 +1,10 @@
 import React from 'react';
 import { TicketIcon, UsersIcon } from 'lucide-react';
+import { Link } from 'react-router-dom';
+
 export const CtaSection = () => {
-  return <section className="bg-gray-50 py-16">
+  return (
+    <section className="bg-gray-50 py-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* For Event Attendees */}
@@ -19,9 +22,12 @@ export const CtaSection = () => {
                 favorite artists and venues.
               </p>
               <div className="mt-8">
-                <a href="#browse" className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                <Link
+                  to="/events"
+                  className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+                >
                   Browse Events
-                </a>
+                </Link>
               </div>
             </div>
           </div>
@@ -38,13 +44,17 @@ export const CtaSection = () => {
                 management, marketing, and real-time analytics.
               </p>
               <div className="mt-8">
-                <a href="#sell-tickets" className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-indigo-800 bg-white hover:bg-indigo-50">
+                <Link
+                  to="/sell"
+                  className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-indigo-800 bg-white hover:bg-indigo-50"
+                >
                   Start Selling
-                </a>
+                </Link>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </section>;
+    </section>
+  );
 };
