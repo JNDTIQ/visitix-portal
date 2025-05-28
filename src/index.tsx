@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
 import './index.css'; 
+// Import buffer polyfill for browser compatibility
+import './utils/buffer-polyfill';
 
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 root.render(

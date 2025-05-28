@@ -1,9 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { fetchEvents } from '../services/eventService';
-import { fetchResaleTickets, createResaleListing } from '../services/resaleService';
-import { CalendarIcon, MapPinIcon, TagIcon, AlertCircleIcon } from 'lucide-react';
+import { 
+  fetchResaleTickets, 
+  fetchAllResaleTickets, 
+  createResaleListing, 
+  fetchUserResaleTickets,
+  deleteResaleTicket
+} from '../services/resaleService';
+import { CalendarIcon, MapPinIcon, TagIcon, AlertCircleIcon, Trash2 as TrashIcon, Edit as EditIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import EditTicketForm from '../components/EditTicketForm';
+import SellTicketForm from '../components/SellTicketForm';
 
 interface Event {
   id: string;
@@ -25,36 +33,259 @@ interface ResaleTicket {
   section?: string;
   row?: string;
   createdAt: string;
+  eventTitle?: string;
 }
 
 const TicketResalePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { currentUser, userProfile } = useAuth();
+  
+  // Check if there's a tab parameter in the URL
+  const queryParams = new URLSearchParams(location.search);
+  const tabParam = queryParams.get('tab');
+
   const [event, setEvent] = useState<Event | null>(null);
   const [resaleTickets, setResaleTickets] = useState<ResaleTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const navigate = useNavigate();
-  const { currentUser, userProfile } = useAuth();
+
+  // My listings state
+  const [showMyListings, setShowMyListings] = useState(tabParam === 'my-listings');
+  const [myListings, setMyListings] = useState<ResaleTicket[]>([]);
+  
+  // All resale tickets (when no specific event is selected)
+  const [allResaleTickets, setAllResaleTickets] = useState<ResaleTicket[]>([]);
+  const [allEvents, setAllEvents] = useState<{[id: string]: Event}>({});
 
   // Sell ticket form state
   const [showSellForm, setShowSellForm] = useState(false);
+  
+  // State for editing ticket
+  const [editingTicket, setEditingTicket] = useState<ResaleTicket | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  
+  // Load all resale tickets if no event ID is provided
+  useEffect(() => {
+    if (!id) {
+      const loadAllResaleTickets = async () => {
+        setLoading(true);
+        try {
+          const tickets = await fetchAllResaleTickets();
+          setAllResaleTickets(tickets);
+          
+          // Fetch events info for all tickets
+          const eventIds = [...new Set(tickets.map(ticket => ticket.eventId))];
+          const eventsData = await fetchEvents();
+          const eventsMap: {[id: string]: Event} = {};
+          
+          eventsData.forEach(event => {
+            if (eventIds.includes(event.id)) {
+              eventsMap[event.id] = event;
+            }
+          });
+          
+          setAllEvents(eventsMap);
+        } catch (err) {
+          setError('Failed to load available resale tickets');
+          console.error(err);
+        } finally {
+          setLoading(false);
+        }
+      };
+      
+      loadAllResaleTickets();
+    }
+  }, [id]);
+  
+  // Load user's own listings
+  useEffect(() => {
+    if (currentUser && showMyListings) {
+      const loadUserListings = async () => {
+        try {
+          const tickets = await fetchUserResaleTickets(currentUser.uid);
+          setMyListings(tickets);
+        } catch (err) {
+          console.error('Failed to load your listings:', err);
+        }
+      };
+      
+      loadUserListings();
+    }
+  }, [currentUser, showMyListings]);
 
-  // If no id, show a message or a list of events to select from
+  // If no id, show all available resale tickets
   if (!id) {
     return (
-      <div className="max-w-2xl mx-auto py-16 text-center">
-        <h2 className="text-2xl font-bold mb-4">Select an event to resell tickets</h2>
-        <p className="text-gray-600 mb-6">
-          Please browse <a href="/events" className="text-indigo-600 underline">Events</a> and choose the event you want to resell tickets for.
-        </p>
+      <div className="max-w-7xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Ticket Marketplace</h1>
+          {currentUser && (
+            <div className="flex gap-4">
+              <button 
+                onClick={() => {
+                  setShowMyListings(!showMyListings);
+                  // Update the URL when changing tabs
+                  if (!showMyListings) {
+                    navigate('/resale?tab=my-listings');
+                  } else {
+                    navigate('/resale');
+                  }
+                }}
+                className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200 transition"
+              >
+                {showMyListings ? 'View All Tickets' : 'My Listings'}
+              </button>
+              <button 
+                onClick={() => navigate('/resale/create')}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition"
+              >
+                List a Ticket
+              </button>
+            </div>
+          )}
+        </div>
+        
+        {loading ? (
+          <div className="text-center py-20">
+            <div className="w-12 h-12 border-t-2 border-b-2 border-indigo-500 rounded-full animate-spin mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading available tickets...</p>
+          </div>
+        ) : error ? (
+          <div className="bg-red-50 border border-red-200 rounded-md p-4 my-6">
+            <div className="flex">
+              <AlertCircleIcon className="h-5 w-5 text-red-500 mr-2" />
+              <p className="text-red-700">{error}</p>
+            </div>
+          </div>
+        ) : showMyListings && currentUser ? (
+          <div>
+            <h2 className="text-xl font-semibold mb-4">Your Ticket Listings</h2>
+            {myListings.length === 0 ? (
+              <p className="text-gray-500 py-8 text-center">You don't have any active ticket listings</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {myListings.map(ticket => (
+                  <div key={ticket.id} className="border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition">
+                    <div className="p-5">
+                      <h3 className="text-lg font-semibold">{ticket.eventTitle}</h3>
+                      <div className="mt-2 flex items-center text-sm text-gray-500">
+                        <TagIcon className="h-4 w-4 mr-1" />
+                        <span>${ticket.price.toFixed(2)} per ticket</span>
+                      </div>
+                      <div className="mt-2 flex items-center text-sm text-gray-500">
+                        <span>Quantity: {ticket.quantity}</span>
+                      </div>
+                      {ticket.section && (
+                        <div className="mt-2 flex items-center text-sm text-gray-500">
+                          <span>Section: {ticket.section}{ticket.row ? `, Row: ${ticket.row}` : ''}</span>
+                        </div>
+                      )}
+                      <div className="mt-3 pt-3 border-t border-gray-200 flex justify-between">
+                        {showDeleteConfirm === ticket.id ? (
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm text-red-600">Confirm delete?</span>
+                            <button 
+                              onClick={() => handleDeleteTicket(ticket.id)}
+                              className="text-sm bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
+                            >
+                              Yes
+                            </button>
+                            <button 
+                              onClick={() => setShowDeleteConfirm(null)}
+                              className="text-sm bg-gray-300 text-gray-700 px-2 py-1 rounded hover:bg-gray-400"
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={() => setShowDeleteConfirm(ticket.id)}
+                            className="text-sm text-red-600 hover:text-red-800 flex items-center"
+                          >
+                            <TrashIcon className="h-4 w-4 mr-1" />
+                            Delete
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => setEditingTicket(ticket)}
+                          className="text-sm text-indigo-600 hover:text-indigo-800 flex items-center"
+                        >
+                          <EditIcon className="h-4 w-4 mr-1" />
+                          Edit
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div>
+            <h2 className="text-xl font-semibold mb-4">Available Resale Tickets</h2>
+            {allResaleTickets.length === 0 ? (
+              <p className="text-gray-500 py-8 text-center">No resale tickets are currently available</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {allResaleTickets.map(ticket => (
+                  <div key={ticket.id} className="border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition">
+                    {allEvents[ticket.eventId] && (
+                      <div className="h-40 w-full overflow-hidden">
+                        <img 
+                          src={allEvents[ticket.eventId].image || 'https://placehold.co/600x400?text=Event+Image'} 
+                          alt={allEvents[ticket.eventId].title}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <div className="p-5">
+                      <h3 className="text-lg font-semibold">
+                        {allEvents[ticket.eventId]?.title || ticket.eventTitle || 'Event'}
+                      </h3>
+                      {allEvents[ticket.eventId] && (
+                        <>
+                          <div className="mt-2 flex items-center text-sm text-gray-500">
+                            <CalendarIcon className="h-4 w-4 mr-1" />
+                            <span>{allEvents[ticket.eventId].date}</span>
+                          </div>
+                          <div className="mt-2 flex items-center text-sm text-gray-500">
+                            <MapPinIcon className="h-4 w-4 mr-1" />
+                            <span>{allEvents[ticket.eventId].location}</span>
+                          </div>
+                        </>
+                      )}
+                      <div className="mt-2 flex items-center text-sm text-gray-500">
+                        <TagIcon className="h-4 w-4 mr-1" />
+                        <span>${ticket.price.toFixed(2)} per ticket</span>
+                      </div>
+                      {ticket.section && (
+                        <div className="mt-2 flex items-center text-sm text-gray-500">
+                          <span>Section: {ticket.section}{ticket.row ? `, Row: ${ticket.row}` : ''}</span>
+                        </div>
+                      )}
+                      <div className="mt-3 pt-3 border-t border-gray-200 flex justify-between">
+                        <span className="text-sm text-gray-500">
+                          {ticket.quantity} {ticket.quantity === 1 ? 'ticket' : 'tickets'} available
+                        </span>
+                        <button 
+                          onClick={() => navigate(`/checkout/resale/${ticket.id}`)}
+                          className="text-sm text-indigo-600 hover:text-indigo-800"
+                        >
+                          Purchase
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   }
-  const [price, setPrice] = useState('');
-  const [quantity, setQuantity] = useState(1);
-  const [section, setSection] = useState('');
-  const [row, setRow] = useState('');
-  const [sellingError, setSellingError] = useState('');
   const [sellingSuccess, setSellingSuccess] = useState('');
 
   useEffect(() => {
@@ -82,63 +313,47 @@ const TicketResalePage: React.FC = () => {
     loadData();
   }, [id]);
 
-  const handleSubmitListing = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!currentUser) {
-      navigate('/login', { state: { from: `/resale/${id}` } });
-      return;
-    }
-    
-    if (!price || Number(price) <= 0) {
-      setSellingError('Please enter a valid price');
-      return;
-    }
-    
-    try {
-      const ticketData = {
-        eventId: id!,
-        sellerId: currentUser.uid,
-        sellerName: userProfile?.displayName || 'Anonymous',
-        price: Number(price),
-        quantity,
-        section,
-        row,
-        createdAt: new Date().toISOString()
-      };
-      
-      await createResaleListing(ticketData);
-      setSellingSuccess('Your ticket has been listed for resale!');
-      
-      // Reset form
-      setPrice('');
-      setQuantity(1);
-      setSection('');
-      setRow('');
-      setSellingError('');
-      
-      // Refresh ticket listings
-      const updatedTickets = await fetchResaleTickets(id!);
-      setResaleTickets(updatedTickets);
-      
-      // Hide form after successful submission
-      setTimeout(() => {
-        setShowSellForm(false);
-        setSellingSuccess('');
-      }, 3000);
-      
-    } catch (err) {
-      console.error('Error creating listing:', err);
-      setSellingError('Failed to create listing. Please try again.');
-    }
-  };
-
   const handlePurchaseTicket = (ticketId: string) => {
     if (!currentUser) {
       navigate('/login', { state: { from: `/resale/${id}` } });
       return;
     }
     navigate(`/checkout/resale/${ticketId}`);
+  };
+
+  // Function to handle ticket deletion
+  const handleDeleteTicket = async (ticketId: string) => {
+    setLoading(true);
+    try {
+      await deleteResaleTicket(ticketId);
+      
+      // Update listings after deletion
+      if (currentUser) {
+        const updatedListings = await fetchUserResaleTickets(currentUser.uid);
+        setMyListings(updatedListings);
+      }
+      
+      setShowDeleteConfirm(null);
+    } catch (err) {
+      console.error('Failed to delete ticket:', err);
+      setError('Failed to delete ticket. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Function to refresh listings after an edit
+  const handleTicketUpdated = async () => {
+    setEditingTicket(null);
+    
+    if (currentUser) {
+      try {
+        const updatedListings = await fetchUserResaleTickets(currentUser.uid);
+        setMyListings(updatedListings);
+      } catch (err) {
+        console.error('Failed to refresh listings:', err);
+      }
+    }
   };
 
   if (loading) {
@@ -224,104 +439,27 @@ const TicketResalePage: React.FC = () => {
 
               {/* Sell ticket form */}
               {showSellForm && (
-                <div className="bg-gray-50 rounded-lg p-6 mb-6 border border-gray-200">
-                  <h3 className="text-lg font-medium mb-4">List Your Tickets</h3>
-                  
-                  {sellingError && (
-                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                      {sellingError}
-                    </div>
-                  )}
-                  
-                  {sellingSuccess && (
-                    <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-                      {sellingSuccess}
-                    </div>
-                  )}
-                  
-                  <form onSubmit={handleSubmitListing}>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-1">
-                          Price per ticket ($)
-                        </label>
-                        <input
-                          type="number"
-                          id="price"
-                          value={price}
-                          onChange={(e) => setPrice(e.target.value)}
-                          className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                          required
-                          min="1"
-                          step="0.01"
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">
-                          Number of tickets
-                        </label>
-                        <select
-                          id="quantity"
-                          value={quantity}
-                          onChange={(e) => setQuantity(Number(e.target.value))}
-                          className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                        >
-                          {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
-                            <option key={num} value={num}>
-                              {num}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label htmlFor="section" className="block text-sm font-medium text-gray-700 mb-1">
-                          Section (optional)
-                        </label>
-                        <input
-                          type="text"
-                          id="section"
-                          value={section}
-                          onChange={(e) => setSection(e.target.value)}
-                          className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="row" className="block text-sm font-medium text-gray-700 mb-1">
-                          Row (optional)
-                        </label>
-                        <input
-                          type="text"
-                          id="row"
-                          value={row}
-                          onChange={(e) => setRow(e.target.value)}
-                          className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="bg-yellow-50 border border-yellow-100 p-4 rounded-md mb-4">
-                      <div className="flex">
-                        <AlertCircleIcon className="h-5 w-5 text-yellow-400 mr-2" />
-                        <div>
-                          <p className="text-sm text-yellow-700">
-                            By listing tickets for resale, you confirm that:
-                          </p>
-                          <ul className="list-disc pl-5 mt-1 text-xs text-yellow-600">
-                            <li>You are authorized to resell these tickets</li>
-                            <li>Tickets are valid and will be transferred upon purchase</li>
-                            <li>A 10% service fee will be deducted from your earnings</li>
-                          </ul>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <button
-                      type="submit"
-                      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-md font-medium"
-                    >
-                      List Tickets for Sale
-                    </button>
-                  </form>
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                  <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                    <SellTicketForm
+                      eventId=""
+                      eventTitle="Generic Resale Listing"
+                      onListingCreated={() => {
+                        setShowSellForm(false);
+                        // Refresh ticket listings after creating a new one
+                        if (currentUser) {
+                          fetchUserResaleTickets(currentUser.uid)
+                            .then(tickets => setMyListings(tickets))
+                            .catch(err => console.error('Failed to refresh listings:', err));
+                          
+                          fetchAllResaleTickets()
+                            .then(tickets => setAllResaleTickets(tickets))
+                            .catch(err => console.error('Failed to refresh all tickets:', err));
+                        }
+                      }}
+                      onCancel={() => setShowSellForm(false)}
+                    />
+                  </div>
                 </div>
               )}
               
@@ -456,6 +594,47 @@ const TicketResalePage: React.FC = () => {
           </div>
         </div>
       </div>
+      
+      {/* Edit Ticket Form Modal */}
+      {editingTicket && (
+        <EditTicketForm 
+          ticket={editingTicket} 
+          onClose={() => setEditingTicket(null)} 
+          onSuccess={handleTicketUpdated} 
+        />
+      )}
+      
+      {/* Display success message if set */}
+      {sellingSuccess && (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+          {sellingSuccess}
+        </div>
+      )}
+      
+      {/* Use the enhanced SellTicketForm for specific events too */}
+      {showSellForm && (
+        <div className="bg-white rounded-lg p-6 mb-6 border border-gray-200">
+          <SellTicketForm
+            eventId={id!}
+            eventTitle={event.title}
+            onListingCreated={() => {
+              setShowSellForm(false);
+              setSellingSuccess('Your ticket has been listed for resale!');
+              
+              // Refresh ticket listings
+              fetchResaleTickets(id!)
+                .then(tickets => setResaleTickets(tickets))
+                .catch(err => console.error('Failed to refresh tickets:', err));
+              
+              // Hide success message after a delay
+              setTimeout(() => {
+                setSellingSuccess('');
+              }, 3000);
+            }}
+            onCancel={() => setShowSellForm(false)}
+          />
+        </div>
+      )}
     </div>
   );
 };

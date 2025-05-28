@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchEventById } from '../services/eventService';
-import { CalendarIcon, MapPinIcon, Clock10Icon, TagIcon, UsersIcon } from 'lucide-react';
+import { CalendarIcon, MapPinIcon, TagIcon, UsersIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface Event {
@@ -217,6 +217,15 @@ const EventDetailPage: React.FC = () => {
                   className="w-full bg-transparent border border-indigo-600 text-indigo-600 py-3 rounded-md font-medium hover:bg-indigo-50 transition-colors"
                 >
                   View Resale Marketplace
+                </button>
+              </div>
+              
+              <div className="mt-4">
+                <button
+                  onClick={() => navigate(`/resale/create?eventId=${id}`)}
+                  className="w-full bg-transparent border border-green-600 text-green-600 py-3 rounded-md font-medium hover:bg-green-50 transition-colors"
+                >
+                  List Tickets for Resale
                 </button>
               </div>
             </div>
