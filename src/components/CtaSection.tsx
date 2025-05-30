@@ -1,12 +1,7 @@
-<<<<<<< HEAD
 import React from 'react';
-import { TicketIcon, UsersIcon } from 'lucide-react';
+import { RepeatIcon, TicketIcon, UsersIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-=======
-import { TicketIcon, UsersIcon, RepeatIcon } from 'lucide-react';
-import { Link } from 'react-router-dom';
->>>>>>> 136b7c2c08794b1e31e08d983ef0af9e06975562
 export const CtaSection = () => {
   return (
     <section className="bg-gray-50 py-16">
@@ -27,14 +22,10 @@ export const CtaSection = () => {
                 favorite artists and venues.
               </p>
               <div className="mt-8">
-<<<<<<< HEAD
                 <Link
                   to="/events"
                   className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
                 >
-=======
-                <Link to="/events" className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
->>>>>>> 136b7c2c08794b1e31e08d983ef0af9e06975562
                   Browse Events
                 </Link>
               </div>
@@ -73,14 +64,10 @@ export const CtaSection = () => {
                 management, marketing, and real-time analytics.
               </p>
               <div className="mt-8">
-<<<<<<< HEAD
                 <Link
                   to="/sell"
                   className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-indigo-800 bg-white hover:bg-indigo-50"
                 >
-=======
-                <Link to="/sell" className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-indigo-800 bg-white hover:bg-indigo-50">
->>>>>>> 136b7c2c08794b1e31e08d983ef0af9e06975562
                   Start Selling
                 </Link>
               </div>
