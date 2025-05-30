@@ -3,10 +3,11 @@ import { CalendarIcon, LogInIcon, TicketIcon, MenuIcon, XIcon, UserIcon } from '
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { logoutUser } from '../services/authService';
+import UserVerificationBadge from './UserVerificationBadge';
 
 export const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { currentUser } = useAuth();
+  const { currentUser, verificationStatus } = useAuth();
 
   const handleLogout = async () => {
     try {
@@ -45,13 +46,23 @@ export const Navbar = () => {
             
             {currentUser ? (
               <>
-                <Link
-                  to="/profile"
-                  className="flex items-center text-gray-700 hover:text-indigo-600 px-3 py-2 text-sm font-medium"
-                >
-                  <UserIcon className="h-5 w-5 mr-1" />
-                  My Account
-                </Link>
+                <div className="flex items-center">
+                  <Link
+                    to="/profile"
+                    className="flex items-center text-gray-700 hover:text-indigo-600 px-3 py-2 text-sm font-medium"
+                  >
+                    <UserIcon className="h-5 w-5 mr-1" />
+                    My Account
+                  </Link>
+                  {verificationStatus && !verificationStatus.isVerified && (
+                    <Link 
+                      to="/verify-identity"
+                      className="ml-2"
+                    >
+                      <UserVerificationBadge showLink={false} className="py-0.5 px-2 text-xs" />
+                    </Link>
+                  )}
+                </div>
                 <button
                   onClick={handleLogout}
                   className="flex items-center text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-md text-sm font-medium"
@@ -110,14 +121,25 @@ export const Navbar = () => {
             
             {currentUser ? (
               <>
-                <Link
-                  to="/profile"
-                  className="flex items-center text-gray-700 hover:bg-gray-50 block px-3 py-2 text-base font-medium"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  <UserIcon className="h-5 w-5 mr-2" />
-                  My Account
-                </Link>
+                <div className="flex items-center">
+                  <Link
+                    to="/profile"
+                    className="flex items-center text-gray-700 hover:bg-gray-50 block px-3 py-2 text-base font-medium"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <UserIcon className="h-5 w-5 mr-2" />
+                    My Account
+                  </Link>
+                  {verificationStatus && !verificationStatus.isVerified && (
+                    <Link 
+                      to="/verify-identity"
+                      className="ml-2"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <UserVerificationBadge showLink={false} className="py-0.5 px-2 text-xs" />
+                    </Link>
+                  )}
+                </div>
                 <button
                   onClick={() => {
                     handleLogout();

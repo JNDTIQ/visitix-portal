@@ -27,6 +27,7 @@ export interface ResaleTicket {
   validationId?: string;
   ticketFiles?: string[];
   ticketType?: 'physical' | 'digital';
+  uploadStatus?: 'pending' | 'complete';
 }
 
 interface ResaleTicketInput {
@@ -42,6 +43,7 @@ interface ResaleTicketInput {
   validationId?: string;
   ticketFiles?: string[];
   ticketType?: 'physical' | 'digital';
+  uploadStatus?: 'pending' | 'complete';
 }
 
 /**
@@ -132,9 +134,21 @@ export const fetchResaleTickets = async (eventId: string): Promise<ResaleTicket[
  */
 export const createResaleListing = async (ticketData: ResaleTicketInput): Promise<string> => {
   try {
+    // Handle placeholder URLs by marking them as pending uploads
+    let modifiedTicketData = { ...ticketData };
+    
+    // If there are ticket files with placeholder URLs, mark them for later processing
+    if (ticketData.ticketFiles && ticketData.ticketFiles.length > 0) {
+      const hasPlaceholders = ticketData.ticketFiles.some(url => url.startsWith('placeholder://'));
+      
+      if (hasPlaceholders) {
+        modifiedTicketData.uploadStatus = 'pending';
+      }
+    }
+    
     // Add server timestamp for accurate sorting
     const dataWithTimestamp = {
-      ...ticketData,
+      ...modifiedTicketData,
       createdAt: ticketData.createdAt || new Date().toISOString(),
       serverTimestamp: serverTimestamp()
     };

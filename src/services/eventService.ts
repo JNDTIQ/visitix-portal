@@ -1,4 +1,4 @@
-import { collection, getDocs, getDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
 export interface Event {
@@ -57,5 +57,16 @@ export const fetchEventById = async (eventId: string): Promise<Event | null> => 
   } catch (error) {
     console.error('Error fetching event by ID:', error);
     return null;
+  }
+};
+
+// Delete an event by its ID
+export const deleteEvent = async (eventId: string): Promise<boolean> => {
+  try {
+    await deleteDoc(doc(db, 'events', eventId));
+    return true;
+  } catch (error) {
+    console.error('Error deleting event:', error);
+    return false;
   }
 };

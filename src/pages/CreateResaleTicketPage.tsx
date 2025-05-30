@@ -3,15 +3,16 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { createResaleListing } from '../services/resaleService';
 import { fetchEvents, Event } from '../services/eventService';
-import { useTicketUpload } from '../hooks/useTicketUploadResale';
+import { useTicketUploadResaleOptimized } from '../hooks/useTicketUploadResaleOptimized';
+import UserVerificationBadge from '../components/UserVerificationBadge';
 
 // Removed local Event interface; using Event from eventService instead
 
 const CreateResaleTicketPage: React.FC = () => {
-  const { currentUser, userProfile } = useAuth();
+  const { currentUser, userProfile, verificationStatus } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { uploadFiles, getUploadedUrls } = useTicketUpload();
+  const { uploadFiles, error: uploadError } = useTicketUploadResaleOptimized();
   
   // Get eventId from URL query parameter if available
   const queryParams = new URLSearchParams(location.search);
@@ -99,16 +100,28 @@ const CreateResaleTicketPage: React.FC = () => {
       setError('You must be logged in to list tickets for resale');
       return;
     }
+    
+    // Check if user is verified before allowing to list tickets
+    if (!verificationStatus.isVerified) {
+      setError('You must complete identity verification before listing tickets for resale');
+      setTimeout(() => {
+        navigate('/verify-identity');
+      }, 2000);
+      return;
+    }
 
     setLoading(true);
     setError('');
     
     try {
-      // Upload ticket files if provided
+      // Upload ticket files if provided - returns placeholder URLs immediately
       let ticketFiles: string[] = [];
       if (selectedFiles.length > 0) {
-        await uploadFiles(selectedFiles);
-        ticketFiles = getUploadedUrls();
+        ticketFiles = await uploadFiles(selectedFiles);
+        
+        if (uploadError) {
+          console.warn("Upload warning:", uploadError);
+        }
       }
       
       // Get the selected event title
@@ -133,7 +146,7 @@ const CreateResaleTicketPage: React.FC = () => {
       
       await createResaleListing(resaleTicketData);
       
-      setSuccessMessage('Your ticket has been successfully listed for resale!');
+      setSuccessMessage('Your ticket has been successfully listed for resale! File uploads will continue in the background.');
       
       // Redirect to the user's listings page after a short delay
       setTimeout(() => {
@@ -142,7 +155,11 @@ const CreateResaleTicketPage: React.FC = () => {
       
     } catch (err) {
       console.error('Error listing ticket for resale:', err);
-      setError('Failed to list your ticket. Please try again.');
+      if (err instanceof Error && err.message.includes('upload')) {
+        setError('There was an issue uploading your ticket files. Your listing may still have been created. Please check your listings after a few minutes or try again.');
+      } else {
+        setError('Failed to list your ticket. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -151,6 +168,26 @@ const CreateResaleTicketPage: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold text-gray-900 mb-6">List a Ticket for Resale</h1>
+      
+      {/* Verification Check */}
+      {verificationStatus && !verificationStatus.isVerified && verificationStatus.status !== 'approved' && (
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded mb-6">
+          <h3 className="font-semibold text-lg mb-2">Verification Required</h3>
+          <p className="mb-3">
+            To protect our users and ensure secure transactions, we require identity and banking verification 
+            before you can list tickets for resale.
+          </p>
+          <div className="mb-3">
+            <UserVerificationBadge />
+          </div>
+          <button 
+            onClick={() => navigate('/verify-identity')}
+            className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition"
+          >
+            Complete Verification
+          </button>
+        </div>
+      )}
       
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">

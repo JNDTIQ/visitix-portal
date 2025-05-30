@@ -14,12 +14,16 @@ import ProfilePage from './components/ProfilePage';
 import ForgotPassword from './components/ForgotPassword';
 import ProtectedRoute from './components/ProtectedRoute';
 import VerifierRoute from './components/VerifierRoute';
+import AdminRoute from './components/AdminRoute';
 import { AuthProvider } from './contexts/AuthContext';
 import PaymentCompletePage from './pages/PaymentCompletePage';
 import SellTicketsPage from './pages/SellTicketsPage';
 import TicketTransferPage from './pages/TicketTransferPage';
 import TicketVerificationPage from './pages/TicketVerificationPage';
 import CreateResaleTicketPage from './pages/CreateResaleTicketPage';
+import AdminSetup from './components/AdminSetup';
+import VerificationForm from './components/VerificationForm';
+import VerificationRequests from './components/VerificationRequests';
 
 export function App() {
   return (
@@ -98,6 +102,30 @@ export function App() {
                 <VerifierRoute>
                   <TicketVerificationPage />
                 </VerifierRoute>
+              } 
+            />
+            <Route 
+              path="/admin-setup" 
+              element={
+                <ProtectedRoute>
+                  <AdminSetup />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/verify-identity" 
+              element={
+                <ProtectedRoute>
+                  <VerificationForm />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/verification-requests" 
+              element={
+                <AdminRoute>
+                  <VerificationRequests />
+                </AdminRoute>
               } 
             />
           </Routes>

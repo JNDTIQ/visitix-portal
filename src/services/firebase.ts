@@ -7,7 +7,7 @@ const firebaseConfig = {
     apiKey: "AIzaSyCxBP2zuImfAz474zMKI6j8VoRdDxHtibM",
     authDomain: "visitix-ed209.firebaseapp.com",
     projectId: "visitix-ed209",
-    storageBucket: "visitix-ed209.firebasestorage.app",
+    storageBucket: "visitix-ed209.appspot.com",
     messagingSenderId: "513905734617",
     appId: "1:513905734617:web:3a739f76ffd2aca9005fc8"
   };

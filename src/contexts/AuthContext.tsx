@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { getAuth, onAuthStateChanged, User } from "firebase/auth";
 import { fetchUserProfile } from "../services/userService";
+import { checkUserVerification } from "../services/verificationService";
 
 export type UserRole = 'user' | 'admin' | 'verifier';
 
@@ -13,22 +14,32 @@ interface UserProfile {
   metadata?: Record<string, any>;
 }
 
+interface VerificationStatus {
+  isVerified: boolean;
+  status?: 'pending' | 'approved' | 'rejected';
+  data?: any;
+}
+
 interface AuthContextType {
   currentUser: User | null;
   userProfile: UserProfile | null;
   loading: boolean;
+  verificationStatus: VerificationStatus;
   hasRole: (role: UserRole) => boolean;
   isVerifier: () => boolean;
   isAdmin: () => boolean;
+  refreshVerificationStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   currentUser: null,
   userProfile: null,
   loading: true,
+  verificationStatus: { isVerified: false },
   hasRole: () => false,
   isVerifier: () => false,
   isAdmin: () => false,
+  refreshVerificationStatus: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -41,6 +52,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [verificationStatus, setVerificationStatus] = useState<VerificationStatus>({ isVerified: false });
 
   // Check if user has a specific role
   const hasRole = (role: UserRole): boolean => {
@@ -56,6 +68,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Convenience method to check if user is an admin
   const isAdmin = (): boolean => {
     return hasRole('admin');
+  };
+  
+  // Method to refresh verification status
+  const refreshVerificationStatus = async (): Promise<void> => {
+    if (currentUser) {
+      try {
+        const status = await checkUserVerification(currentUser.uid);
+        setVerificationStatus(status);
+      } catch (error) {
+        console.error("Error fetching verification status:", error);
+      }
+    }
   };
 
   useEffect(() => {
@@ -85,6 +109,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               roles: ['user']
             });
           }
+          
+          // Check verification status
+          await refreshVerificationStatus();
         } catch (error) {
           console.error("Error fetching user profile:", error);
           // Set a basic profile with user role as fallback
@@ -98,6 +125,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       } else {
         setUserProfile(null);
+        setVerificationStatus({ isVerified: false });
       }
       
       setLoading(false);
@@ -110,9 +138,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     currentUser,
     userProfile,
     loading,
+    verificationStatus,
     hasRole,
     isVerifier,
-    isAdmin
+    isAdmin,
+    refreshVerificationStatus
   };
 
   return (
