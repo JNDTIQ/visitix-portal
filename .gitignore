@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Large files that exceed GitHub's limits
+google-cloud-cli-465.0.0-linux-x86_64.tar.gz
+google-cloud-sdk/bin/anthoscli
+google-cloud-sdk/data/cli/gcloud.json
