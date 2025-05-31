@@ -27,7 +27,7 @@ const EventDetailPage: React.FC = () => {
   const [error, setError] = useState('');
   const [quantity, setQuantity] = useState(1);
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser, verificationStatus } = useAuth();
 
   useEffect(() => {
     const loadEvent = async () => {
@@ -82,7 +82,26 @@ const EventDetailPage: React.FC = () => {
   };
 
   const handleResaleMarketplace = () => {
-    navigate(`/resale/${id}`);
+    navigate('/resale');
+  };
+
+  const handleListTicketsForResale = () => {
+    if (!currentUser) {
+      navigate('/login', { state: { from: `/event/${id}` } });
+      return;
+    }
+    
+    // Check if user is verified before allowing to list tickets
+    if (!verificationStatus.isVerified) {
+      // Show alert and redirect to verification page
+      alert('You must complete identity verification before listing tickets for resale');
+      setTimeout(() => {
+        navigate('/verify-identity');
+      }, 500);
+      return;
+    }
+    
+    navigate(`/resale/create?eventId=${id}`);
   };
 
   return (
@@ -222,7 +241,7 @@ const EventDetailPage: React.FC = () => {
               
               <div className="mt-4">
                 <button
-                  onClick={() => navigate(`/resale/create?eventId=${id}`)}
+                  onClick={handleListTicketsForResale}
                   className="w-full bg-transparent border border-green-600 text-green-600 py-3 rounded-md font-medium hover:bg-green-50 transition-colors"
                 >
                   List Tickets for Resale

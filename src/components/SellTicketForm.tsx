@@ -19,7 +19,7 @@ const SellTicketForm: React.FC<SellTicketFormProps> = ({
   onListingCreated,
   onCancel 
 }) => {
-  const { currentUser, userProfile } = useAuth();
+  const { currentUser, userProfile, verificationStatus, isSuperuser } = useAuth();
   const [price, setPrice] = useState<number>(0);
   const [quantity, setQuantity] = useState<number>(1);
   const [section, setSection] = useState<string>('');
@@ -35,7 +35,7 @@ const SellTicketForm: React.FC<SellTicketFormProps> = ({
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [verificationResults, setVerificationResults] = useState<any[]>([]);
   const [validationId, setValidationId] = useState<string | null>(null);
-  const [verificationStatus, setVerificationStatus] = useState<'pending' | 'verified' | 'failed'>('pending');
+  const [ticketVerificationStatus, setTicketVerificationStatus] = useState<'pending' | 'verified' | 'failed'>('pending');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -56,6 +56,22 @@ const SellTicketForm: React.FC<SellTicketFormProps> = ({
       return;
     }
     
+    // Check if user is superuser or creator and bypass verification
+    const isCreatorBypass = currentUser && currentUser.email === 'javariwhilby04@gmail.com';
+    if ((isSuperuser && isSuperuser()) || isCreatorBypass) {
+      // skip all verification checks in this form
+    } else {
+      // Check if user is verified before allowing to list tickets
+      if (!verificationStatus.isVerified) {
+        setError('You must complete identity verification before listing tickets for resale');
+        // Add redirect to verification page after a short delay
+        setTimeout(() => {
+          window.location.href = '/verify-identity';
+        }, 2000);
+        return;
+      }
+    }
+    
     if (price <= 0) {
       setError('Price must be greater than 0');
       return;
@@ -72,6 +88,26 @@ const SellTicketForm: React.FC<SellTicketFormProps> = ({
   
   const handleTicketValidationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!currentUser) {
+      setError('You must be logged in to sell tickets');
+      return;
+    }
+    
+    // Check if user is superuser or creator and bypass verification
+    const isCreatorBypass = currentUser && currentUser.email === 'javariwhilby04@gmail.com';
+    if ((isSuperuser && isSuperuser()) || isCreatorBypass) {
+      // skip all verification checks in this form
+    } else {
+      // Double-check verification status before proceeding
+      if (!verificationStatus.isVerified) {
+        setError('You must complete identity verification before listing tickets for resale');
+        setTimeout(() => {
+          window.location.href = '/verify-identity';
+        }, 2000);
+        return;
+      }
+    }
     
     if (ticketType === 'digital' && files.length === 0) {
       setError('Please upload at least one ticket file');
@@ -101,7 +137,7 @@ const SellTicketForm: React.FC<SellTicketFormProps> = ({
           setVerificationResults(prev => [...prev, result]);
           
           if (result.verificationStatus === 'verified') {
-            setVerificationStatus('verified');
+            setTicketVerificationStatus('verified');
           }
         }
       } else if (ticketType === 'physical' && qrCodeData.trim()) {
@@ -111,14 +147,14 @@ const SellTicketForm: React.FC<SellTicketFormProps> = ({
         setVerificationResults([result]);
         
         if (result.verificationStatus === 'verified') {
-          setVerificationStatus('verified');
+          setTicketVerificationStatus('verified');
         }
       }
       
       setIsProcessing(false);
       
       // If verified, move to create listing
-      if (verificationStatus === 'verified') {
+      if (ticketVerificationStatus === 'verified') {
         await handleCreateListing();
       }
     } catch (err: any) {
@@ -133,12 +169,23 @@ const SellTicketForm: React.FC<SellTicketFormProps> = ({
     setLoading(true);
     setError('');
     
+    // Final verification check before creating the listing
+    const isCreatorBypass = currentUser && currentUser.email === 'javariwhilby04@gmail.com';
+    if (!verificationStatus.isVerified && !(isSuperuser && isSuperuser()) && !isCreatorBypass) {
+      setError('You must complete identity verification before listing tickets for resale');
+      setTimeout(() => {
+        window.location.href = '/verify-identity';
+      }, 2000);
+      setLoading(false);
+      return;
+    }
+    
     try {
       const ticketData = {
         eventId,
         sellerId: currentUser!.uid,
         sellerName: userProfile?.displayName || currentUser!.email || 'Anonymous',
-        price,
+        price: parseFloat(String(price)), // Ensure price is a number
         quantity,
         section: section || undefined,
         row: row || undefined,
@@ -223,6 +270,23 @@ const SellTicketForm: React.FC<SellTicketFormProps> = ({
           </div>
         )}
         
+        {/* Show verification status if not verified */}
+        {!verificationStatus.isVerified && (
+          <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md mb-4 flex items-start">
+            <AlertTriangle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="font-medium">Verification Required</p>
+              <p className="text-sm mt-1">You must complete identity verification before listing tickets for resale.</p>
+              <a 
+                href="/verify-identity" 
+                className="inline-block mt-2 text-sm font-medium text-indigo-600 hover:text-indigo-800"
+              >
+                Complete Verification →
+              </a>
+            </div>
+          </div>
+        )}
+        
         <form onSubmit={handleTicketInfoSubmit}>
           <div className="mb-4">
             <label className="block text-gray-700 text-sm font-medium mb-1">
@@ -287,10 +351,12 @@ const SellTicketForm: React.FC<SellTicketFormProps> = ({
             </button>
             <button
               type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              disabled={loading}
+              className={`px-4 py-2 text-sm font-medium text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
+                !verificationStatus.isVerified ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'
+              }`}
+              disabled={loading || !verificationStatus.isVerified}
             >
-              Continue to Validation
+              {!verificationStatus.isVerified ? 'Verification Required' : 'Continue to Validation'}
             </button>
           </div>
         </form>
@@ -473,10 +539,14 @@ const SellTicketForm: React.FC<SellTicketFormProps> = ({
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                disabled={loading || (ticketType === 'digital' && files.length === 0) || (ticketType === 'physical' && !qrCodeData.trim())}
+                className={`px-4 py-2 text-sm font-medium text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
+                  !verificationStatus.isVerified || loading || (ticketType === 'digital' && files.length === 0) || (ticketType === 'physical' && !qrCodeData.trim())
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-indigo-600 hover:bg-indigo-700'
+                }`}
+                disabled={loading || !verificationStatus.isVerified || (ticketType === 'digital' && files.length === 0) || (ticketType === 'physical' && !qrCodeData.trim())}
               >
-                {loading ? 'Processing...' : 'Validate & List Ticket'}
+                {loading ? 'Processing...' : !verificationStatus.isVerified ? 'Verification Required' : 'Validate & List Ticket'}
               </button>
             </div>
           </form>

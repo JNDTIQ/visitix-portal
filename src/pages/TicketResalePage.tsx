@@ -40,7 +40,7 @@ const TicketResalePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser, userProfile } = useAuth();
+  const { currentUser, userProfile, verificationStatus } = useAuth();
   
   // Check if there's a tab parameter in the URL
   const queryParams = new URLSearchParams(location.search);
@@ -138,7 +138,14 @@ const TicketResalePage: React.FC = () => {
                 {showMyListings ? 'View All Tickets' : 'My Listings'}
               </button>
               <button 
-                onClick={() => navigate('/resale/create')}
+                onClick={() => {
+                  if (!verificationStatus.isVerified) {
+                    alert('You must complete identity verification before listing tickets for resale');
+                    navigate('/verify-identity');
+                    return;
+                  }
+                  navigate('/resale/create');
+                }}
                 className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition"
               >
                 List a Ticket
@@ -427,6 +434,11 @@ const TicketResalePage: React.FC = () => {
                   onClick={() => {
                     if (!currentUser) {
                       navigate('/login', { state: { from: `/resale/${id}` } });
+                      return;
+                    }
+                    if (!verificationStatus.isVerified) {
+                      alert('You must complete identity verification before listing tickets for resale');
+                      navigate('/verify-identity');
                       return;
                     }
                     setShowSellForm(!showSellForm);

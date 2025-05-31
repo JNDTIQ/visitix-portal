@@ -1,7 +1,25 @@
 import { db, storage } from './firebase';
 import { collection, doc, setDoc, getDoc, query, where, getDocs, updateDoc } from 'firebase/firestore';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { VerificationData, VerificationSubmission } from '../models/verification';
+
+// Maximum retries for upload
+const MAX_UPLOAD_RETRIES = 3;
+const RETRY_DELAY = 1000; // ms
+
+// Check if the storage emulator is available
+const isEmulatorAvailable = (): boolean => {
+  try {
+    // The storage._delegate._url should contain the emulator URL if connected
+    return (storage as any)._delegate._url?.includes('localhost') || 
+           (storage as any)._delegate._url?.includes('github.dev');
+  } catch (e) {
+    return false;
+  }
+};
+
+// Helper function to add delay between retries
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const verificationCollection = 'userVerifications';
 
@@ -43,49 +61,72 @@ export const checkUserVerification = async (userId: string): Promise<{
  */
 export const submitVerification = async (userId: string, submission: VerificationSubmission): Promise<{ success: boolean; error?: string }> => {
   try {
-    // 1. Upload ID document if provided
-    let idDocumentUrl;
-    if (submission.idDocument) {
+    // 1. Upload ID document if provided, or use direct URL if available
+    let idDocumentUrl = submission.idDocumentDirectUrl;
+    
+    if (!idDocumentUrl && submission.idDocument) {
       const timestamp = new Date().getTime();
       const fileName = `verification_docs/${userId}/${timestamp}_id.${submission.idDocument.name.split('.').pop()}`;
       const storageRef = ref(storage, fileName);
       
-      // Convert file to base64 string and upload
-      const reader = new FileReader();
-      const fileUploadPromise = new Promise<string>((resolve, reject) => {
-        reader.onload = async (e) => {
+      // Check if using emulator - use appropriate upload method
+      if (isEmulatorAvailable()) {
+        console.log('Using emulator for upload');
+        // Use uploadBytesResumable for better progress tracking and error handling
+        const uploadTask = uploadBytesResumable(storageRef, submission.idDocument, {
+          contentType: submission.idDocument.type,
+          customMetadata: {
+            'fileName': submission.idDocument.name,
+            'userId': userId,
+            'timestamp': timestamp.toString(),
+            'source': 'verification-upload-emulator'
+          }
+        });
+        
+        // Wait for completion
+        await uploadTask;
+        idDocumentUrl = await getDownloadURL(storageRef);
+      } else {
+        console.log('Using production upload with retry logic');
+        // Use uploadBytes with retry logic for production
+        let uploadSuccess = false;
+        let lastError = null;
+        let retries = MAX_UPLOAD_RETRIES;
+        
+        while (retries > 0 && !uploadSuccess) {
           try {
-            if (!e.target || typeof e.target.result !== 'string') {
-              throw new Error('Failed to read file');
-            }
-            
-            // Get the base64 string (remove the data URL prefix)
-            const base64String = e.target.result.split(',')[1];
-            
-            // Set metadata to indicate the file type
-            const metadata = {
-              contentType: submission.idDocument!.type,
+            // Add specific content type and metadata
+            await uploadBytes(storageRef, submission.idDocument, {
+              contentType: submission.idDocument.type,
               customMetadata: {
-                'fileName': submission.idDocument!.name,
-                'userId': userId
+                'fileName': submission.idDocument.name,
+                'userId': userId,
+                'timestamp': timestamp.toString(),
+                'source': 'verification-upload'
               }
-            };
-            
-            // Upload the file as a base64 string
-            await uploadString(storageRef, base64String, 'base64', metadata);
+            });
             
             // Get the download URL
-            const downloadUrl = await getDownloadURL(storageRef);
-            resolve(downloadUrl);
+            idDocumentUrl = await getDownloadURL(storageRef);
+            uploadSuccess = true;
           } catch (err) {
-            reject(err);
+            lastError = err;
+            retries--;
+            console.log(`Upload attempt failed, retries left: ${retries}`);
+            if (retries > 0) {
+              await delay(RETRY_DELAY);
+            }
           }
-        };
-        reader.onerror = (err) => reject(err);
-      });
-      
-      reader.readAsDataURL(submission.idDocument);
-      idDocumentUrl = await fileUploadPromise;
+        }
+        
+        if (!uploadSuccess) {
+          console.error('All upload attempts failed:', lastError);
+          return { 
+            success: false, 
+            error: lastError instanceof Error ? lastError.message : 'Failed to upload verification document after multiple attempts'
+          };
+        }
+      }
     }
     
     // 2. Create verification record in Firestore
@@ -105,7 +146,7 @@ export const submitVerification = async (userId: string, submission: Verificatio
       accountType: submission.accountType,
       bankName: submission.bankName,
       accountNumber: submission.accountNumber,
-      routingNumber: submission.routingNumber,
+      branchNumber: submission.branchNumber, // Use branchNumber instead of routingNumber
       
       // Additional metadata
       address: submission.address

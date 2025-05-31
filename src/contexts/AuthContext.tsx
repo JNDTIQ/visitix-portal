@@ -3,7 +3,7 @@ import { getAuth, onAuthStateChanged, User } from "firebase/auth";
 import { fetchUserProfile } from "../services/userService";
 import { checkUserVerification } from "../services/verificationService";
 
-export type UserRole = 'user' | 'admin' | 'verifier';
+export type UserRole = 'user' | 'admin' | 'verifier' | 'superuser';
 
 interface UserProfile {
   id: string;
@@ -28,6 +28,7 @@ interface AuthContextType {
   hasRole: (role: UserRole) => boolean;
   isVerifier: () => boolean;
   isAdmin: () => boolean;
+  isSuperuser: () => boolean;
   refreshVerificationStatus: () => Promise<void>;
 }
 
@@ -39,6 +40,7 @@ const AuthContext = createContext<AuthContextType>({
   hasRole: () => false,
   isVerifier: () => false,
   isAdmin: () => false,
+  isSuperuser: () => false,
   refreshVerificationStatus: async () => {},
 });
 
@@ -62,12 +64,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Convenience method to check if user is a verifier
   const isVerifier = (): boolean => {
-    return hasRole('verifier') || hasRole('admin');
+    return hasRole('verifier') || hasRole('admin') || hasRole('superuser');
   };
 
   // Convenience method to check if user is an admin
   const isAdmin = (): boolean => {
-    return hasRole('admin');
+    return hasRole('admin') || hasRole('superuser');
+  };
+
+  // New: Convenience method to check if user is a superuser
+  const isSuperuser = (): boolean => {
+    return hasRole('superuser');
   };
   
   // Method to refresh verification status
@@ -142,6 +149,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     hasRole,
     isVerifier,
     isAdmin,
+    isSuperuser, // add to context
     refreshVerificationStatus
   };
 

@@ -15,6 +15,7 @@ import ForgotPassword from './components/ForgotPassword';
 import ProtectedRoute from './components/ProtectedRoute';
 import VerifierRoute from './components/VerifierRoute';
 import AdminRoute from './components/AdminRoute';
+import VerifiedUserRoute from './components/VerifiedUserRoute';
 import { AuthProvider } from './contexts/AuthContext';
 import PaymentCompletePage from './pages/PaymentCompletePage';
 import SellTicketsPage from './pages/SellTicketsPage';
@@ -24,6 +25,7 @@ import CreateResaleTicketPage from './pages/CreateResaleTicketPage';
 import AdminSetup from './components/AdminSetup';
 import VerificationForm from './components/VerificationForm';
 import VerificationRequests from './components/VerificationRequests';
+import TroubleshootPage from './pages/TroubleshootPage';
 
 export function App() {
   return (
@@ -42,7 +44,14 @@ export function App() {
                 </>
               }
             />
-            <Route path="/sell" element={<SellTicketsPage />} />
+            <Route 
+              path="/sell" 
+              element={
+                <VerifiedUserRoute>
+                  <SellTicketsPage />
+                </VerifiedUserRoute>
+              } 
+            />
             <Route path="/events" element={<EventsPage />} />
             <Route path="/event/:id" element={<EventDetailPage />} />
             <Route path="/resale" element={<TicketResalePage />} /> {/* Main resale route - accessible from CTA and navigation */}
@@ -50,9 +59,9 @@ export function App() {
             <Route 
               path="/resale/create" 
               element={
-                <ProtectedRoute>
+                <VerifiedUserRoute>
                   <CreateResaleTicketPage />
-                </ProtectedRoute>
+                </VerifiedUserRoute>
               } 
             /> {/* New route for creating a resale ticket */}
             <Route 
@@ -126,6 +135,14 @@ export function App() {
                 <AdminRoute>
                   <VerificationRequests />
                 </AdminRoute>
+              } 
+            />
+            <Route 
+              path="/troubleshoot" 
+              element={
+                <ProtectedRoute>
+                  <TroubleshootPage />
+                </ProtectedRoute>
               } 
             />
           </Routes>

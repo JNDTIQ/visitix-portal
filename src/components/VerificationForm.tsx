@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { submitVerification } from '../services/verificationService';
 import { VerificationSubmission } from '../models/verification';
 import { AlertCircle, Check, Upload } from 'lucide-react';
+import DirectUpload from './DirectUpload';
 
 const VerificationForm: React.FC = () => {
   const { currentUser, refreshVerificationStatus } = useAuth();
@@ -13,6 +14,8 @@ const VerificationForm: React.FC = () => {
   const [success, setSuccess] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [useDirectUpload, setUseDirectUpload] = useState(false);
+  const [directUploadUrl, setDirectUploadUrl] = useState('');
 
   // Form state
   const [formData, setFormData] = useState<VerificationSubmission>({
@@ -24,14 +27,14 @@ const VerificationForm: React.FC = () => {
     accountType: 'checking',
     bankName: '',
     accountNumber: '',
-    routingNumber: '',
+    branchNumber: '', // New field for Caribbean banks
     
     address: {
       street: '',
+      streetDetails: '', // New field for additional street details
+      parish: '', // New field for Jamaican parish
       city: '',
-      state: '',
-      postalCode: '',
-      country: 'USA'
+      country: 'Jamaica',
     }
   });
 
@@ -82,12 +85,12 @@ const VerificationForm: React.FC = () => {
       return;
     }
     
-    if (!formData.accountHolderName || !formData.bankName || !formData.accountNumber || !formData.routingNumber) {
+    if (!formData.accountHolderName || !formData.bankName || !formData.accountNumber || !formData.branchNumber) {
       setError('Please fill in all required banking fields');
       return;
     }
     
-    if (!selectedFile) {
+    if (!selectedFile && !directUploadUrl) {
       setError('Please upload a photo of your ID');
       return;
     }
@@ -99,8 +102,13 @@ const VerificationForm: React.FC = () => {
       // Submit verification with file
       const submissionData: VerificationSubmission = {
         ...formData,
-        idDocument: selectedFile
+        idDocument: selectedFile || undefined
       };
+      
+      // If we have a direct upload URL, we'll use that instead
+      if (directUploadUrl) {
+        submissionData.idDocumentDirectUrl = directUploadUrl;
+      }
       
       const result = await submitVerification(currentUser.uid, submissionData);
       
@@ -115,11 +123,29 @@ const VerificationForm: React.FC = () => {
           navigate('/profile');
         }, 3000);
       } else {
-        setError(result.error || 'Failed to submit verification information');
+        if (result.error && (result.error.includes('CORS') || result.error.includes('upload'))) {
+          setError(
+            `${result.error || 'Failed to submit verification information'}. 
+            Please try using our troubleshooting page to resolve the issue: 
+            <a href="/troubleshoot" class="text-indigo-600 hover:text-indigo-800 underline">Go to Troubleshooting</a>`
+          );
+        } else {
+          setError(result.error || 'Failed to submit verification information');
+        }
       }
     } catch (err) {
       console.error('Error submitting verification:', err);
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+      
+      if (errorMessage.includes('CORS') || errorMessage.includes('upload')) {
+        setError(
+          `${errorMessage}. 
+          Please try using our troubleshooting page to resolve the issue: 
+          <a href="/troubleshoot" class="text-indigo-600 hover:text-indigo-800 underline">Go to Troubleshooting</a>`
+        );
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -150,7 +176,7 @@ const VerificationForm: React.FC = () => {
               <AlertCircle className="h-5 w-5 text-red-600" />
             </div>
             <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
+              <p className="text-sm text-red-700" dangerouslySetInnerHTML={{ __html: error }}></p>
             </div>
           </div>
         </div>
@@ -228,37 +254,72 @@ const VerificationForm: React.FC = () => {
                 Upload ID Document <span className="text-red-500">*</span>
               </label>
               
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                className="hidden"
-                accept="image/*,.pdf"
-              />
-              
-              <div 
-                className="border-2 border-dashed border-gray-300 rounded-md p-6 cursor-pointer hover:bg-gray-50"
-                onClick={triggerFileInput}
-              >
-                <div className="flex flex-col items-center justify-center">
-                  <Upload className="h-10 w-10 text-gray-400 mb-2" />
-                  {selectedFile ? (
-                    <div className="text-center">
-                      <span className="text-indigo-600 font-medium">{selectedFile.name}</span>
-                      <p className="text-gray-500 text-sm mt-1">
-                        {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="text-center">
-                      <span className="text-gray-600">Click to upload your ID document</span>
-                      <p className="text-gray-500 text-sm mt-1">
-                        Supported formats: JPEG, PNG, PDF (max 10MB)
-                      </p>
+              {useDirectUpload ? (
+                <div className="mb-4">
+                  <DirectUpload 
+                    userId={currentUser?.uid || ''} 
+                    onUploadSuccess={(url) => {
+                      setDirectUploadUrl(url);
+                      setError('');
+                    }}
+                    onUploadError={(err) => setError(err)}
+                  />
+                  {directUploadUrl && (
+                    <div className="mt-2 bg-green-50 p-3 rounded-md flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span className="text-sm text-green-700">Document uploaded successfully</span>
                     </div>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => setUseDirectUpload(false)}
+                    className="text-sm text-indigo-600 hover:text-indigo-800 mt-2"
+                  >
+                    Switch to regular upload
+                  </button>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    className="hidden"
+                    accept="image/*,.pdf"
+                  />
+                  
+                  <div 
+                    className="border-2 border-dashed border-gray-300 rounded-md p-6 cursor-pointer hover:bg-gray-50"
+                    onClick={triggerFileInput}
+                  >
+                    <div className="flex flex-col items-center justify-center">
+                      <Upload className="h-10 w-10 text-gray-400 mb-2" />
+                      {selectedFile ? (
+                        <div className="text-center">
+                          <span className="text-indigo-600 font-medium">{selectedFile.name}</span>
+                          <p className="text-gray-500 text-sm mt-1">
+                            {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="text-center">
+                          <span className="text-gray-600">Click to upload your ID document</span>
+                          <p className="text-gray-500 text-sm mt-1">
+                            Supported formats: JPEG, PNG, PDF (max 10MB)
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setUseDirectUpload(true)}
+                    className="text-sm text-indigo-600 hover:text-indigo-800 mt-2"
+                  >
+                    Having trouble uploading? Try direct upload
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -315,21 +376,19 @@ const VerificationForm: React.FC = () => {
             </div>
             
             <div>
-              <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="routingNumber">
-                Routing Number <span className="text-red-500">*</span>
+              <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="branchNumber">
+                Branch Number <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
-                id="routingNumber"
-                name="routingNumber"
-                value={formData.routingNumber}
+                id="branchNumber"
+                name="branchNumber"
+                value={formData.branchNumber}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 required
-                pattern="^\d{9}$"
-                title="Routing number must be 9 digits"
               />
-              <p className="text-xs text-gray-500 mt-1">9-digit number</p>
+              <p className="text-xs text-gray-500 mt-1">Enter your bank branch number</p>
             </div>
             
             <div>
@@ -367,10 +426,51 @@ const VerificationForm: React.FC = () => {
                 required
               />
             </div>
-            
+            <div className="col-span-2">
+              <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="address.streetDetails">
+                Additional Street Details
+              </label>
+              <input
+                type="text"
+                id="address.streetDetails"
+                name="address.streetDetails"
+                value={formData.address?.streetDetails}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="address.parish">
+                Parish <span className="text-red-500">*</span>
+              </label>
+              <select
+                id="address.parish"
+                name="address.parish"
+                value={formData.address?.parish}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                required
+              >
+                <option value="">Select Parish</option>
+                <option value="Kingston">Kingston</option>
+                <option value="St. Andrew">St. Andrew</option>
+                <option value="St. Thomas">St. Thomas</option>
+                <option value="Portland">Portland</option>
+                <option value="St. Mary">St. Mary</option>
+                <option value="St. Ann">St. Ann</option>
+                <option value="Trelawny">Trelawny</option>
+                <option value="St. James">St. James</option>
+                <option value="Hanover">Hanover</option>
+                <option value="Westmoreland">Westmoreland</option>
+                <option value="St. Elizabeth">St. Elizabeth</option>
+                <option value="Manchester">Manchester</option>
+                <option value="Clarendon">Clarendon</option>
+                <option value="St. Catherine">St. Catherine</option>
+              </select>
+            </div>
             <div>
               <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="address.city">
-                City <span className="text-red-500">*</span>
+                City or Town <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -382,37 +482,6 @@ const VerificationForm: React.FC = () => {
                 required
               />
             </div>
-            
-            <div>
-              <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="address.state">
-                State <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                id="address.state"
-                name="address.state"
-                value={formData.address?.state}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                required
-              />
-            </div>
-            
-            <div>
-              <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="address.postalCode">
-                Postal Code <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                id="address.postalCode"
-                name="address.postalCode"
-                value={formData.address?.postalCode}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                required
-              />
-            </div>
-            
             <div>
               <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="address.country">
                 Country <span className="text-red-500">*</span>

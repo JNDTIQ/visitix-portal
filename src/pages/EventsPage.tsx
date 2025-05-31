@@ -10,7 +10,7 @@ const EventsPage: React.FC = () => {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { isAdmin } = useAuth();
+  const { isAdmin, currentUser, verificationStatus } = useAuth();
 
   const loadEvents = async () => {
     setLoading(true);
@@ -49,6 +49,18 @@ const EventsPage: React.FC = () => {
     }
   };
 
+  const getSellLink = () => {
+    if (!currentUser) return "/login";
+    if (!verificationStatus.isVerified) return "/verify-identity";
+    return "/sell";
+  };
+
+  const getCreateEventText = () => {
+    if (!currentUser) return "Log In to Create";
+    if (!verificationStatus.isVerified) return "Verify to Create";
+    return "Create Event";
+  };
+
   if (loading) {
     return <div className="text-center py-10">Loading events...</div>;
   }
@@ -58,10 +70,10 @@ const EventsPage: React.FC = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Events</h1>
         <Link 
-          to="/sell" 
+          to={getSellLink()} 
           className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition"
         >
-          Create Event
+          {getCreateEventText()}
         </Link>
       </div>
 

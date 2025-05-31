@@ -1,4 +1,5 @@
 import { db } from './firebase';
+import { getAuth } from 'firebase/auth';
 import {
   collection,
   getDocs,
@@ -73,7 +74,7 @@ export const fetchResaleTickets = async (eventId: string): Promise<ResaleTicket[
           eventId: data.eventId || '',
           sellerId: data.sellerId || '',
           sellerName: data.sellerName || '',
-          price: data.price || 0,
+          price: typeof data.price === 'number' ? data.price : parseFloat(data.price) || 0,
           quantity: data.quantity || 0,
           section: data.section,
           row: data.row,
@@ -106,7 +107,7 @@ export const fetchResaleTickets = async (eventId: string): Promise<ResaleTicket[
           eventId: data.eventId || '',
           sellerId: data.sellerId || '',
           sellerName: data.sellerName || '',
-          price: data.price || 0,
+          price: typeof data.price === 'number' ? data.price : parseFloat(data.price) || 0,
           quantity: data.quantity || 0,
           section: data.section,
           row: data.row,
@@ -134,6 +135,20 @@ export const fetchResaleTickets = async (eventId: string): Promise<ResaleTicket[
  */
 export const createResaleListing = async (ticketData: ResaleTicketInput): Promise<string> => {
   try {
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error('User must be logged in to create resale listings');
+    }
+    // Superuser bypass
+    const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+    const userData = userDoc.data();
+    if (!(userData?.roles && userData.roles.includes('superuser'))) {
+      if (!userData?.verificationStatus?.isVerified) {
+        throw new Error('User must be verified to create resale listings');
+      }
+    }
+    
     // Handle placeholder URLs by marking them as pending uploads
     let modifiedTicketData = { ...ticketData };
     
@@ -187,7 +202,7 @@ export const fetchAllResaleTickets = async (): Promise<ResaleTicket[]> => {
           eventId: data.eventId || '',
           sellerId: data.sellerId || '',
           sellerName: data.sellerName || '',
-          price: data.price || 0,
+          price: typeof data.price === 'number' ? data.price : parseFloat(data.price) || 0,
           quantity: data.quantity || 0,
           section: data.section,
           row: data.row,
@@ -219,7 +234,7 @@ export const fetchAllResaleTickets = async (): Promise<ResaleTicket[]> => {
           eventId: data.eventId || '',
           sellerId: data.sellerId || '',
           sellerName: data.sellerName || '',
-          price: data.price || 0,
+          price: typeof data.price === 'number' ? data.price : parseFloat(data.price) || 0,
           quantity: data.quantity || 0,
           section: data.section,
           row: data.row,
@@ -268,7 +283,7 @@ export const fetchUserResaleTickets = async (sellerId: string): Promise<ResaleTi
           eventId: data.eventId || '',
           sellerId: data.sellerId || '',
           sellerName: data.sellerName || '',
-          price: data.price || 0,
+          price: typeof data.price === 'number' ? data.price : parseFloat(data.price) || 0,
           quantity: data.quantity || 0,
           section: data.section,
           row: data.row,
@@ -300,7 +315,7 @@ export const fetchUserResaleTickets = async (sellerId: string): Promise<ResaleTi
           eventId: data.eventId || '',
           sellerId: data.sellerId || '',
           sellerName: data.sellerName || '',
-          price: data.price || 0,
+          price: typeof data.price === 'number' ? data.price : parseFloat(data.price) || 0,
           quantity: data.quantity || 0,
           section: data.section,
           row: data.row,
@@ -337,7 +352,7 @@ export const fetchResaleTicketById = async (ticketId: string): Promise<ResaleTic
       eventId: data.eventId || '',
       sellerId: data.sellerId || '',
       sellerName: data.sellerName || '',
-      price: data.price || 0,
+      price: typeof data.price === 'number' ? data.price : parseFloat(data.price) || 0,
       quantity: data.quantity || 0,
       section: data.section,
       row: data.row,
@@ -517,7 +532,34 @@ export const updateResaleTicket = async (
   updates: Partial<Omit<ResaleTicket, 'id' | 'createdAt'>>
 ): Promise<void> => {
   try {
+    // Verify the user's verification status at the service level
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+    
+    if (!currentUser) {
+      throw new Error('User must be logged in to update resale listings');
+    }
+    
+    // Fetch verification status
+    const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+    const userData = userDoc.data();
+    
+    if (!userData?.verificationStatus?.isVerified) {
+      throw new Error('User must be verified to update resale listings');
+    }
+
     const ticketRef = doc(db, 'resaleTickets', ticketId);
+    
+    // Verify the user owns this ticket
+    const ticketDoc = await getDoc(ticketRef);
+    if (!ticketDoc.exists()) {
+      throw new Error('Ticket listing not found');
+    }
+    
+    const ticketData = ticketDoc.data();
+    if (ticketData.sellerId !== currentUser.uid) {
+      throw new Error('Unauthorized: You can only update your own ticket listings');
+    }
     
     // Add server timestamp for accurate sorting of updated listings
     const updatesWithTimestamp = {
@@ -539,7 +581,35 @@ export const updateResaleTicket = async (
  */
 export const deleteResaleTicket = async (ticketId: string): Promise<void> => {
   try {
+    // Verify the user's verification status at the service level
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+    
+    if (!currentUser) {
+      throw new Error('User must be logged in to delete resale listings');
+    }
+    
+    // Fetch verification status
+    const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+    const userData = userDoc.data();
+    
+    if (!userData?.verificationStatus?.isVerified) {
+      throw new Error('User must be verified to manage resale listings');
+    }
+
     const ticketRef = doc(db, 'resaleTickets', ticketId);
+    
+    // Verify the user owns this ticket before deletion
+    const ticketDoc = await getDoc(ticketRef);
+    if (!ticketDoc.exists()) {
+      throw new Error('Ticket listing not found');
+    }
+    
+    const ticketData = ticketDoc.data();
+    if (ticketData.sellerId !== currentUser.uid) {
+      throw new Error('Unauthorized: You can only delete your own ticket listings');
+    }
+    
     await deleteDoc(ticketRef);
   } catch (error) {
     console.error('Error deleting resale ticket:', error);

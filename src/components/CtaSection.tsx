@@ -1,8 +1,17 @@
 import React from 'react';
 import { RepeatIcon, TicketIcon, UsersIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 export const CtaSection = () => {
+  const { currentUser, verificationStatus } = useAuth();
+  
+  // Determine the link target for the Sell button based on auth & verification status
+  const getSellLink = () => {
+    if (!currentUser) return "/login";
+    if (!verificationStatus.isVerified) return "/verify-identity";
+    return "/sell";
+  }
   return (
     <section className="bg-gray-50 py-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -65,10 +74,15 @@ export const CtaSection = () => {
               </p>
               <div className="mt-8">
                 <Link
-                  to="/sell"
+                  to={getSellLink()}
                   className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-indigo-800 bg-white hover:bg-indigo-50"
                 >
-                  Start Selling
+                  {!currentUser 
+                    ? "Log In to Sell" 
+                    : !verificationStatus.isVerified 
+                      ? "Verify to Sell" 
+                      : "Start Selling"
+                  }
                 </Link>
               </div>
             </div>

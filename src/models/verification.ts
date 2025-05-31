@@ -15,14 +15,14 @@ export interface VerificationData {
   accountType: 'checking' | 'savings';
   bankName: string;
   accountNumber: string;
-  routingNumber: string;
+  branchNumber: string; // Changed from routingNumber to branchNumber
   
   // Additional metadata
   address?: {
     street: string;
+    streetDetails: string; // New field for additional street details
+    parish: string; // New field for Jamaican parish
     city: string;
-    state: string;
-    postalCode: string;
     country: string;
   };
   
@@ -35,18 +35,19 @@ export interface VerificationSubmission {
   idType: 'passport' | 'driverLicense' | 'nationalId' | 'other';
   idNumber: string;
   idDocument?: File;
+  idDocumentDirectUrl?: string; // Direct URL for uploads that bypassed the normal flow
   
   accountHolderName: string;
   accountType: 'checking' | 'savings';
   bankName: string;
   accountNumber: string;
-  routingNumber: string;
+  branchNumber: string; // Changed from routingNumber to branchNumber
   
   address?: {
     street: string;
+    streetDetails: string; // New field for additional street details
+    parish: string; // New field for Jamaican parish
     city: string;
-    state: string;
-    postalCode: string;
     country: string;
   };
 }

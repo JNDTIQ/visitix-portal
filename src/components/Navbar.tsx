@@ -36,13 +36,42 @@ export const Navbar = () => {
               <CalendarIcon className="h-5 w-5 mr-1" />
               Events
             </Link>
-            <Link
-              to="/sell"
-              className="flex items-center text-gray-700 hover:text-indigo-600 px-3 py-2 text-sm font-medium"
-            >
-              <TicketIcon className="h-5 w-5 mr-1" />
-              Sell Tickets
-            </Link>
+            
+            {/* Conditionally render the Sell Tickets link based on verification status */}
+            {currentUser ? (
+              <div className="relative group">
+                <Link
+                  to={verificationStatus.isVerified ? "/sell" : "/verify-identity"}
+                  className={`flex items-center ${
+                    verificationStatus.isVerified 
+                      ? "text-gray-700 hover:text-indigo-600" 
+                      : "text-gray-400"
+                  } px-3 py-2 text-sm font-medium`}
+                >
+                  <TicketIcon className="h-5 w-5 mr-1" />
+                  Sell Tickets
+                  {!verificationStatus.isVerified && (
+                    <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                      Verify
+                    </span>
+                  )}
+                </Link>
+                {!verificationStatus.isVerified && (
+                  <div className="absolute z-10 hidden group-hover:block bg-black text-white text-xs rounded py-1 px-2 right-0 bottom-0 mb-6 w-48">
+                    Verification required to sell tickets
+                    <svg className="absolute text-black h-2 w-full left-0 top-full" x="0px" y="0px" viewBox="0 0 255 255"><polygon className="fill-current" points="0,0 127.5,127.5 255,0"/></svg>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Link
+                to="/login"
+                className="flex items-center text-gray-700 hover:text-indigo-600 px-3 py-2 text-sm font-medium"
+              >
+                <TicketIcon className="h-5 w-5 mr-1" />
+                Sell Tickets
+              </Link>
+            )}
             
             {currentUser ? (
               <>
@@ -110,13 +139,24 @@ export const Navbar = () => {
               <CalendarIcon className="h-5 w-5 mr-2" />
               Events
             </Link>
+            
+            {/* Conditionally render the Sell Tickets link in mobile menu */}
             <Link
-              to="/sell"
-              className="flex items-center text-gray-700 hover:bg-gray-50 block px-3 py-2 text-base font-medium"
+              to={currentUser && verificationStatus.isVerified ? "/sell" : currentUser ? "/verify-identity" : "/login"}
+              className={`flex items-center ${
+                !currentUser || verificationStatus.isVerified 
+                  ? "text-gray-700" 
+                  : "text-gray-400"
+              } hover:bg-gray-50 block px-3 py-2 text-base font-medium`}
               onClick={() => setIsMenuOpen(false)}
             >
               <TicketIcon className="h-5 w-5 mr-2" />
               Sell Tickets
+              {currentUser && !verificationStatus.isVerified && (
+                <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                  Verify First
+                </span>
+              )}
             </Link>
             
             {currentUser ? (

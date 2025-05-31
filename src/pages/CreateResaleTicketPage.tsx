@@ -170,7 +170,7 @@ const CreateResaleTicketPage: React.FC = () => {
       <h1 className="text-3xl font-bold text-gray-900 mb-6">List a Ticket for Resale</h1>
       
       {/* Verification Check */}
-      {verificationStatus && !verificationStatus.isVerified && verificationStatus.status !== 'approved' && (
+      {!verificationStatus.isVerified ? (
         <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded mb-6">
           <h3 className="font-semibold text-lg mb-2">Verification Required</h3>
           <p className="mb-3">
@@ -187,19 +187,20 @@ const CreateResaleTicketPage: React.FC = () => {
             Complete Verification
           </button>
         </div>
-      )}
-      
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
-          {error}
-        </div>
-      )}
-      
-      {successMessage && (
-        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-6">
-          {successMessage}
-        </div>
-      )}
+      ) : (
+        // Only show the form to verified users
+        <>
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
+              {error}
+            </div>
+          )}
+          
+          {successMessage && (
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-6">
+              {successMessage}
+            </div>
+          )}
       
       <div className="bg-white shadow-md rounded-lg p-6 mb-8">
         <h2 className="text-xl font-semibold mb-4">Scan Existing Ticket</h2>
@@ -369,6 +370,8 @@ const CreateResaleTicketPage: React.FC = () => {
           </div>
         </form>
       </div>
+        </>
+      )}
     </div>
   );
 };

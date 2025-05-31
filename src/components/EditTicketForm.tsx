@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { updateResaleTicket } from '../services/resaleService';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 interface ResaleTicket {
   id: string;
@@ -23,11 +25,23 @@ const EditTicketForm: React.FC<EditTicketFormProps> = ({ ticket, onClose, onSucc
   const [row, setRow] = useState(ticket.row || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { currentUser, verificationStatus } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+
+    // Check if user is verified
+    if (!verificationStatus.isVerified) {
+      setError('You must complete identity verification before editing ticket listings');
+      setTimeout(() => {
+        navigate('/verify-identity');
+      }, 2000);
+      setLoading(false);
+      return;
+    }
 
     // Validate inputs
     const priceNum = parseFloat(price);
