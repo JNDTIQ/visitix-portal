@@ -213,8 +213,8 @@ const VerificationRequests: React.FC = () => {
                     </div>
                     
                     <div>
-                      <p className="text-sm text-gray-500">Routing Number</p>
-                      <p className="font-medium">**** **** {activeRequest.routingNumber.slice(-4)}</p>
+                      <p className="text-sm text-gray-500">Branch Number</p>
+                      <p className="font-medium">**** **** {activeRequest.branchNumber.slice(-4)}</p>
                     </div>
                   </div>
                 </div>
@@ -226,7 +226,7 @@ const VerificationRequests: React.FC = () => {
                     
                     <p>
                       {activeRequest.address.street}<br />
-                      {activeRequest.address.city}, {activeRequest.address.state} {activeRequest.address.postalCode}<br />
+                      {activeRequest.address.city}, {activeRequest.address.parish}<br />
                       {activeRequest.address.country}
                     </p>
                   </div>

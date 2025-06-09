@@ -49,11 +49,6 @@ export const revokeVerifierRole = async (uid: string): Promise<void> => {
   return await removeUserRole(uid, 'verifier');
 };
 
-// Assign admin role
-export const assignAdminRole = async (uid: string): Promise<void> => {
-  return await addUserRole(uid, 'admin');
-};
-
 // Check if user has verifier permissions
 export const isUserVerifier = async (uid: string): Promise<boolean> => {
   const profile = await fetchUserProfile(uid);

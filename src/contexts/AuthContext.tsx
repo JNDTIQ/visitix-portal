@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { getAuth, onAuthStateChanged, User } from "firebase/auth";
-import { fetchUserProfile } from "../services/userService";
 import { checkUserVerification } from "../services/verificationService";
+import { db } from '../services/firebase'; // Import the db instance
 
 export type UserRole = 'user' | 'admin' | 'verifier' | 'superuser';
 
@@ -10,7 +10,7 @@ interface UserProfile {
   email: string;
   displayName?: string;
   photoURL?: string;
-  roles: UserRole[];
+  role: 'admin' | 'user'; // Simplified role for frontend
   metadata?: Record<string, any>;
 }
 
@@ -41,7 +41,7 @@ const AuthContext = createContext<AuthContextType>({
   isVerifier: () => false,
   isAdmin: () => false,
   isSuperuser: () => false,
-  refreshVerificationStatus: async () => {},
+  refreshVerificationStatus: async () => Promise.resolve(),
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -58,8 +58,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Check if user has a specific role
   const hasRole = (role: UserRole): boolean => {
-    if (!userProfile || !userProfile.roles) return false;
-    return userProfile.roles.includes(role);
+    if (!userProfile || !userProfile.role) return false;
+    return userProfile.role === role;
   };
 
   // Convenience method to check if user is a verifier
@@ -91,54 +91,62 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    let unsubscribeVerification: (() => void) | null = null;
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
-      
       if (user) {
-        // Fetch user profile data from Firestore
+        // Fetch user role from backend
+        const token = await user.getIdToken();
+        let role: 'admin' | 'user' = 'user';
         try {
-          const profileData = await fetchUserProfile(user.uid);
-          
-          if (profileData) {
-            // Set default roles if none exist
-            if (!profileData.roles) {
-              profileData.roles = ['user'];
-            }
-            
-            setUserProfile(profileData as UserProfile);
-          } else {
-            // Create a basic profile if none exists
-            setUserProfile({
-              id: user.uid,
-              email: user.email || '',
-              displayName: user.displayName || undefined,
-              photoURL: user.photoURL || undefined,
-              roles: ['user']
-            });
-          }
-          
-          // Check verification status
-          await refreshVerificationStatus();
-        } catch (error) {
-          console.error("Error fetching user profile:", error);
-          // Set a basic profile with user role as fallback
-          setUserProfile({
-            id: user.uid,
-            email: user.email || '',
-            displayName: user.displayName || undefined,
-            photoURL: user.photoURL || undefined,
-            roles: ['user']
+          const res = await fetch('/api/me', {
+            headers: { Authorization: `Bearer ${token}` }
           });
+          if (res.ok) {
+            const data = await res.json();
+            role = data.role;
+          }
+        } catch (e) {
+          // fallback: user
         }
+        setUserProfile({
+          id: user.uid,
+          email: user.email || '',
+          displayName: user.displayName || undefined,
+          photoURL: user.photoURL || undefined,
+          role
+        });
+        // --- Add Firestore listener for verification status ---
+        const { doc, onSnapshot } = await import('firebase/firestore');
+        const verificationDocRef = doc(db, 'userVerifications', user.uid);
+        unsubscribeVerification = onSnapshot(verificationDocRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setVerificationStatus({
+              isVerified: data.status === 'approved',
+              status: data.status,
+              data
+            });
+          } else {
+            setVerificationStatus({ isVerified: false });
+          }
+        });
       } else {
         setUserProfile(null);
         setVerificationStatus({ isVerified: false });
+        if (unsubscribeVerification) {
+          unsubscribeVerification();
+          unsubscribeVerification = null;
+        }
       }
-      
       setLoading(false);
     });
-
-    return unsubscribe;
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeVerification) {
+        unsubscribeVerification();
+      }
+    };
   }, []);
 
   const value = {

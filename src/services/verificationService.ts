@@ -185,6 +185,15 @@ export const updateVerificationStatus = async (
       reviewedAt: new Date().toISOString(),
       reviewNotes: notes
     });
+
+    // Also update the user's profile with verification status for permissions
+    const userProfileRef = doc(db, 'users', userId);
+    await updateDoc(userProfileRef, {
+      verificationStatus: {
+        isVerified: status === 'approved',
+        status: status
+      }
+    });
   } catch (error) {
     console.error('Error updating verification status:', error);
     throw error;
